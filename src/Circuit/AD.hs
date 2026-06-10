@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- | Reverse-mode automatic differentiation via a lens-shaped base arrow.
 --
@@ -42,6 +43,8 @@ import Circuit.Classes
 #endif
 
 import Circuit.Additive (Additive (..))
+import Circuit.Dup (Dup (..))
+import Circuit.Instances (MonoidalP (..))
 import Circuit.Traced (Trace (..))
 import Prelude hiding (id, (.))
 
@@ -139,3 +142,56 @@ traceNFrom x0 n (D body) = D $ \b ->
             da = iterate stepBwd (zero ()) !! n
          in snd (backward (da, dc))
    in (c, pullback)
+
+-- ---------------------------------------------------------------------------
+-- Dup D — copy and discard for the differentiable arrow.
+--
+-- In D, the bimonoid is self-dual under differentiation: copy's pullback
+-- is plus, discard's pullback is zero, plus's pullback is dup, zero's
+-- pullback is discard.  transpose's Copy ↔ Add, Discard ↔ Zero table is
+-- not a rule imposed on syntax — it's the instance structure of D read
+-- off at the semantic level.
+
+-- | Copy in D: the pullback is 'plus' (fan-in on the backward pass).
+--
+-- >>> import Circuit.Instances (MonoidalP(..))
+-- >>> import Circuit.Dup (Dup(..))
+-- >>> let (_, pb) = runD (dup :: D Int (Int, Int)) 5
+-- >>> pb (1, 2)
+-- 3
+instance Additive (->) a => Dup D a where
+  dup = D (\a -> ((a, a), plus))
+  {-# INLINE dup #-}
+
+  discard = D (\a -> ((), \() -> zero ()))
+  {-# INLINE discard #-}
+
+-- | Add in D: the pullback is 'dup' (fan-out on the backward pass).
+--
+-- >>> let (_, pb) = runD (plus :: D (Int, Int) Int) (3, 4)
+-- >>> pb 1
+-- (1,1)
+instance Additive (->) a => Additive D a where
+  plus = D (\(a, b) -> (plus (a, b), \d -> (d, d)))
+  {-# INLINE plus #-}
+
+  zero = D (\() -> (zero (), \_ -> ()))
+  {-# INLINE zero #-}
+
+-- | Monoidal product for D: independent wires, no additive constraint.
+--
+-- >>> let f = D (\x -> (x + 1, \d -> d)) :: D Int Int
+-- >>> let g = D (\x -> (x * 2, \d -> 2 * d)) :: D Int Int
+-- >>> let (y, pb) = runD (parA f g) (3, 4)
+-- >>> y
+-- (4,8)
+-- >>> pb (1, 1)
+-- (1,2)
+instance MonoidalP D where
+  parA (D f) (D g) = D $ \(a, c) ->
+    let (b, fb) = f a; (d, gd) = g c
+     in ((b, d), \(db, dd) -> (fb db, gd dd))
+  {-# INLINE parA #-}
+
+  swapA = D (\(a, b) -> ((b, a), \(db, da) -> (da, db)))
+  {-# INLINE swapA #-}
