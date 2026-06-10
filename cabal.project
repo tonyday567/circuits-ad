@@ -1,0 +1,9 @@
+packages:
+  circuits-ad.cabal
+  ../circuits/circuits.cabal
+  ../../other/ad-delcont/ad-delcont.cabal
+
+write-ghc-environment-files: always
+
+allow-newer:
+  ad-delcont:base

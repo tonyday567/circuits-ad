@@ -1,0 +1,28 @@
+cabal-version: 3.0
+name: circuits-ad
+version: 0.1.0.0
+license: BSD-3-Clause
+author: Tony Day
+maintainer: tonyday567@gmail.com
+synopsis: Oracle tests: circuits reverse-mode AD against ad-delcont
+build-type: Simple
+
+common ghc-options-stanza
+  ghc-options:
+    -Wall
+    -Wno-unused-imports
+    -Wno-unused-top-binds
+    -Wno-unused-matches
+
+library
+  import: ghc-options-stanza
+  default-language: GHC2024
+  hs-source-dirs: src
+  exposed-modules:
+    Circuit.AD
+    Circuit.AD.Oracle
+  build-depends:
+    base >=4.18 && <5,
+    circuits,
+    ad-delcont,
+    transformers >=0.5,
