@@ -35,7 +35,7 @@ where
 
 import Circuit.AD (Diff, Diff' (..), pattern Diff, traceStarFrom)
 import Circuit.Dagger (Additive (..))
-import Hasknum.Matrix (FieldStar (..), Matrix (..), matVec, starMatrix)
+import NumHask.Free.Matrix (FieldStar (..), Matrix (..), matVec, starMatrix)
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR

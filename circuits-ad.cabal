@@ -30,7 +30,7 @@ library
   build-depends:
     base >=4.18 && <5,
     circuits,
-    hasknum,
+    numhask-free,
     numhask,
     ad-delcont,
     transformers >=0.5,
@@ -48,5 +48,5 @@ test-suite verify
     base >=4.18 && <5,
     circuits-ad,
     circuits,
-    hasknum,
+    numhask-free,
     numhask,

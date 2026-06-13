@@ -8,7 +8,7 @@
 -- function composition, and every 'Knot' ties an affine feedback equation.
 -- This module eliminates those knots in closed form using the Kleene star
 -- ('NumHask.Algebra.Ring.StarSemiring' for scalar channels,
--- 'Hasknum.Matrix.starMatrix' for vector channels).
+-- 'NumHask.Free.Matrix.starMatrix' for vector channels).
 --
 -- The resulting net has no 'Knot' constructors, so it can be evaluated on
 -- strict carriers without the lazy-knot divergence that 'Trace Pullback (,)'
@@ -29,7 +29,7 @@ import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net (..))
 import Control.Category (Category (..))
 import Data.Proxy (Proxy (..))
-import Hasknum.Matrix (FieldStar (..), Matrix (..), matVec, starMatrix)
+import NumHask.Free.Matrix (FieldStar (..), Matrix (..), matVec, starMatrix)
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR

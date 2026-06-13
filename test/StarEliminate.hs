@@ -12,7 +12,7 @@ import Circuit.AD.Eliminate (eliminateKnots)
 import NumHask.Diff ()
 import Circuit.AD.Pullback (Pullback (..), evalPullback)
 import Data.Proxy (Proxy (..))
-import Hasknum.Matrix (FieldStar (..))
+import NumHask.Free.Matrix (FieldStar (..))
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import Prelude hiding (id, (.))

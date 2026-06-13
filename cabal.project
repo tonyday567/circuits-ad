@@ -3,7 +3,7 @@ packages:
   ../circuits/circuits.cabal
   ../../other/ad-delcont/ad-delcont.cabal
   ../numhask/numhask.cabal
-  ../hasknum/hasknum.cabal
+  ../numhask-free/numhask-free.cabal
 
 write-ghc-environment-files: always
 
