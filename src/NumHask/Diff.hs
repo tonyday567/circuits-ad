@@ -2,7 +2,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- | NumHask algebra instances for 'Diff'.
+-- | NumHask algebra instances for 'Diff''.
 --
 -- A 'Diff s b' is a smooth function @s -> b@ bundled with its pullback.
 -- These instances turn it into a NumHask carrier in its own right, so any
@@ -14,7 +14,7 @@
 -- NumHask-polymorphic code wraps us by using 'Diff' as its carrier, and we
 -- supply the loop/inspectability infrastructure that NumHask itself does not
 -- have.
-module Circuit.AD.NumHask () where
+module NumHask.Diff () where
 
 import Circuit.AD (Diff, Diff' (..), pattern Diff)
 import NumHask.Algebra.Additive qualified as NHA
@@ -175,7 +175,7 @@ instance (P.Num s, P.Num b) => P.Num (Diff' p s b) where
         (b2, p2) = g s
      in (b1 P.- b2, \db -> p1 db P.- p2 db)
 
-  abs _ = P.error "Circuit.AD.NumHask: abs is not differentiable at 0"
-  signum _ = P.error "Circuit.AD.NumHask: signum is not differentiable at 0"
+  abs _ = P.error "NumHask.Diff: abs is not differentiable at 0"
+  signum _ = P.error "NumHask.Diff: signum is not differentiable at 0"
 
   fromInteger n = Diff (\_ -> (P.fromInteger n, const 0))

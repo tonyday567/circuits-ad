@@ -23,8 +23,8 @@ library
     Circuit.AD
     Circuit.AD.Eliminate
     Circuit.AD.Melt
-    Circuit.AD.NumHask
     Circuit.AD.Oracle
+    NumHask.Diff
     Circuit.AD.Pullback
     Circuit.AD.Star
   build-depends:

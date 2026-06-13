@@ -7,7 +7,7 @@ module Tags
 where
 
 import Circuit.AD (Diff, Diff' (..), pattern Diff, runDiff)
-import Circuit.AD.NumHask ()
+import NumHask.Diff ()
 import Control.Category ((.))
 import Prelude hiding (id, (.))
 

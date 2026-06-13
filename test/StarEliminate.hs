@@ -9,7 +9,7 @@ where
 import Circuit.Net (Net (..))
 import Circuit.AD (Diff, Diff' (..), backprop, pattern Diff)
 import Circuit.AD.Eliminate (eliminateKnots)
-import Circuit.AD.NumHask ()
+import NumHask.Diff ()
 import Circuit.AD.Pullback (Pullback (..), evalPullback)
 import Data.Proxy (Proxy (..))
 import Hasknum.Matrix (FieldStar (..))

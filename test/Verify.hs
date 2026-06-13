@@ -9,7 +9,7 @@ import Circuit (Circuit, reify)
 import qualified Circuit
 import Circuit.Net (Net (..))
 import Circuit.AD
-import Circuit.AD.NumHask ()
+import NumHask.Diff ()
 import Circuit.Traced (trace)
 import Circuit.AD.Pullback (evalPullback)
 import Circuit.Dup (Dup (..))
