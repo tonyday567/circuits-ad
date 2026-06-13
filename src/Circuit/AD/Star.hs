@@ -20,9 +20,9 @@
 -- which pays @n@ probes per cotangent and is only as exact as @n@ is
 -- large.  Here the backward pass is exact whenever the star exists.
 --
--- The dependency is deliberate: this module imports "Hasknum.Matrix",
--- making circuits-ad ⇄ hasknum a literal edge rather than a nominal
--- alias.  (Add @hasknum@ to circuits-ad's @build-depends@.)
+-- The dependency is deliberate: this module imports "Circuit.AD.Matrix",
+-- making circuits-ad ⇄ star-matrix a literal edge rather than a nominal
+-- alias.
 module Circuit.AD.Star
   ( -- * Polymorphic bridge
     traceStarMatrix,
@@ -35,7 +35,8 @@ where
 
 import Circuit.AD (Diff, Diff' (..), pattern Diff, traceStarFrom)
 import Circuit.Dagger (Additive (..))
-import NumHask.Free.Matrix (FieldStar (..), Matrix (..), matVec, starMatrix)
+import Circuit.AD.Matrix (Matrix (..), matVec, starMatrix)
+import NumHask.Free.Carriers (FieldStar (..))
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR

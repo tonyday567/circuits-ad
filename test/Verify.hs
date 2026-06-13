@@ -14,6 +14,7 @@ import Circuit.Traced (trace)
 import Circuit.AD.Pullback (evalPullback)
 import Circuit.Dagger (Additive (..), Dup (..))
 import Circuit.Monoidal (MonoidalP (..))
+import MatrixStar (runMatrixStarTests)
 import StarEliminate (runStarEliminateTests)
 import Tags (runTagTests)
 import qualified NumHask.Algebra.Field as NHF
@@ -118,6 +119,7 @@ main = do
   assert "gradient x" gx 6.0
   assert "gradient b" gb 2.0
 
+  runMatrixStarTests
   runStarEliminateTests
   runTagTests
 

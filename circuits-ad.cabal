@@ -22,6 +22,7 @@ library
   exposed-modules:
     Circuit.AD
     Circuit.AD.Eliminate
+    Circuit.AD.Matrix
     Circuit.AD.Melt
     Circuit.AD.Oracle
     NumHask.Diff
@@ -42,6 +43,7 @@ test-suite verify
   hs-source-dirs: test
   main-is: Verify.hs
   other-modules:
+    MatrixStar
     StarEliminate
     Tags
   build-depends:

@@ -88,7 +88,7 @@ instance MonoidalP Pullback where
 -- though, the equation here is /always affine/ — 'Pullback' arrows are
 -- linear by construction — so a knot over a star-semiring carrier can
 -- be eliminated outright ('NumHask' @star@ \/
--- @NumHask.Free.Matrix.starMatrix@) rather than iterated.  See
+-- 'Circuit.AD.Matrix.starMatrix') rather than iterated.  See
 -- @Circuit.AD.Star@ for the closed forms.
 --
 -- >>> let body = Pullback (\(dx', dc) -> (2.0 * dc, dx')) :: Pullback (Double, Double) (Double, Double)
