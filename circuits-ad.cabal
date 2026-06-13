@@ -13,6 +13,7 @@ common ghc-options-stanza
     -Wno-unused-imports
     -Wno-unused-top-binds
     -Wno-unused-matches
+    -Wno-orphans
 
 library
   import: ghc-options-stanza
@@ -20,9 +21,32 @@ library
   hs-source-dirs: src
   exposed-modules:
     Circuit.AD
+    Circuit.AD.Eliminate
+    Circuit.AD.Melt
+    Circuit.AD.NumHask
     Circuit.AD.Oracle
+    Circuit.AD.Pullback
+    Circuit.AD.Star
   build-depends:
     base >=4.18 && <5,
     circuits,
+    hasknum,
+    numhask,
     ad-delcont,
     transformers >=0.5,
+
+test-suite verify
+  import: ghc-options-stanza
+  default-language: GHC2024
+  type: exitcode-stdio-1.0
+  hs-source-dirs: test
+  main-is: Verify.hs
+  other-modules:
+    StarEliminate
+    Tags
+  build-depends:
+    base >=4.18 && <5,
+    circuits-ad,
+    circuits,
+    hasknum,
+    numhask,

@@ -1,13 +1,25 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 -- | Oracle tests: circuits reverse-mode AD against ad-delcont.
 --
 -- Three claims, falsifiable by property test:
 --
--- 1. __Primitive agreement__ — @reify \@D@ matches @rad1@ on the same
+-- 1. __Primitive agreement__ — @reify \\@Diff@ matches @rad1@ on the same
 --    primitive set.
--- 2. __Triangle identity__ — @lower . encode \@D = reify \@D@, and both
+-- 2. __Triangle identity__ — @lower . encode \\@Diff = reify \\@Diff@, and both
 --    match ad-delcont.
--- 3. __Knot differentiation__ — @traceNFrom \@D@ differentiates through a
+-- 3. __Knot differentiation__ — @traceNFrom \\@Diff@ differentiates through a
 --    fixed-point loop.
+--
+-- = Pointwise transposition = lens pullback
+--
+-- Transposing a 'Net Diff' at a point does not need new syntax — the lens
+-- already computes the transpose.  @snd (runDiff (runNet n) a)@ is the
+-- pullback (cotangent→cotangent map) at @a@, and the forward pass of
+-- any hypothetical @transposeAt n a@ would be exactly that function.
+-- The structural rows (Copy↔Add, etc.) are self-dual at the instance
+-- level; only 'Lift' needs both directions, which is what 'Duplex'
+-- provides.
 --
 -- /Stage 2 gap/: the quadratic test (@ax²+bx+c@) is not expressible in
 -- Stage 1.  It requires 'Copy' (use @x@ twice) and 'Add' (sum the
@@ -24,7 +36,7 @@ where
 
 import Control.Category ((>>>))
 import Circuit (Circuit (..), reify)
-import Circuit.AD (D (..), traceNFrom)
+import Circuit.AD (Diff, Diff' (..), pattern Diff, traceNFrom)
 import Numeric.AD.DelCont (rad1)
 import Prelude hiding (id, (.))
 
@@ -33,7 +45,7 @@ import Prelude hiding (id, (.))
 -- 2
 -- >>> import Control.Category ((>>>))
 -- >>> import Circuit (Circuit(..), reify)
--- >>> import Circuit.AD (D(..), traceNFrom)
+-- >>> import Circuit.AD (Diff(..), traceNFrom)
 -- >>> import Numeric.AD.DelCont (rad1)
 -- >>> import Prelude hiding (id, (.))
 
@@ -50,28 +62,28 @@ sinSqr :: Floating a => a -> a
 sinSqr x = sin (x * x)
 
 -- ===========================================================================
--- Test 1: Primitive agreement — reify @D vs rad1
+-- Test 1: Primitive agreement — reify @Diff vs rad1
 -- ===========================================================================
 
--- | @x²@ as a Circuit D.
-sqrCircuit :: Circuit D (,) Double Double
-sqrCircuit = Lift (D (\x -> (x * x, \dx -> 2 * x * dx)))
+-- | @x²@ as a Circuit Diff.
+sqrCircuit :: Circuit Diff (,) Double Double
+sqrCircuit = Lift (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
 
--- | @sin(x²)@ as two composed Lift Ds.
-sinSqrCircuit :: Circuit D (,) Double Double
+-- | @sin(x²)@ as two composed Lift Diffs.
+sinSqrCircuit :: Circuit Diff (,) Double Double
 sinSqrCircuit =
-  Lift (D (\x -> (x * x, \dx -> 2 * x * dx)))
-    >>> Lift (D (\x -> (sin x, \dx -> cos x * dx)))
+  Lift (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
+    >>> Lift (Diff (\x -> (sin x, \dx -> cos x * dx)))
 
--- | Derivative of @x²@ agrees: @reify @D@ vs @rad1@.
+-- | Derivative of @x²@ agrees: @reify @Diff@ vs @rad1@.
 --
--- >>> let test x = let (yc, pb) = runD (reify sqrCircuit) x; (ya, ga) = rad1 sqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
+-- >>> let test x = let (yc, pb) = runDiff (reify sqrCircuit) x; (ya, ga) = rad1 sqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
 -- >>> all test [-2.0, -1.0, 0.0, 0.5, 1.0, 2.5, 10.0]
 -- True
 
--- | Derivative of @sin(x²)@ agrees: composition of two Ds vs @rad1@.
+-- | Derivative of @sin(x²)@ agrees: composition of two Diffs vs @rad1@.
 --
--- >>> let test x = let (yc, pb) = runD (reify sinSqrCircuit) x; (ya, ga) = rad1 sinSqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
+-- >>> let test x = let (yc, pb) = runDiff (reify sinSqrCircuit) x; (ya, ga) = rad1 sinSqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
 -- >>> all test [0.1, 0.5, 1.0]
 -- True
 
@@ -79,25 +91,25 @@ sinSqrCircuit =
 -- Test 2: Triangle identity — lower . encode = reify
 -- ===========================================================================
 
--- | The triangle holds on a simple D circuit.
+-- | The triangle holds on a simple Diff circuit.
 --
 -- >>> import Circuit (encode, lower)
 -- >>> let circuit = sqrCircuit
--- >>> let (yr, pb) = runD (reify circuit) 3.0
+-- >>> let (yr, pb) = runDiff (reify circuit) 3.0
 -- >>> let (ye, pbe) = lower (encode circuit) 3.0
 -- >>> abs (yr - ye) < 1e-10 && abs (pb 1.0 - pbe 1.0) < 1e-10
 -- True
 
--- | The triangle holds on a composed D circuit.
+-- | The triangle holds on a composed Diff circuit.
 --
 -- >>> import Circuit (encode, lower)
 -- >>> let circuit = sinSqrCircuit
--- >>> let test x = let (yr, pb) = runD (reify circuit) x; (ye, pbe) = lower (encode circuit) x in abs (yr - ye) < 1e-10 && abs (pb 1.0 - pbe 1.0) < 1e-10
+-- >>> let test x = let (yr, pb) = runDiff (reify circuit) x; (ye, pbe) = lower (encode circuit) x in abs (yr - ye) < 1e-10 && abs (pb 1.0 - pbe 1.0) < 1e-10
 -- >>> all test [0.1, 0.5, 1.0, 2.0]
 -- True
 
 -- ===========================================================================
--- Test 3: Knot differentiation — traceNFrom @D
+-- Test 3: Knot differentiation — traceNFrom @Diff
 -- ===========================================================================
 
 -- | Square root by Babylonian iteration:
@@ -111,8 +123,8 @@ sinSqrCircuit =
 -- At the fixed point, the backward affine fixpoint @dx = (dx+dout)*jx@
 -- collapses to @dx = 0@, and the gradient flows purely through
 -- @ja = 1\/(2x) = 0.125@ at @x = 4, a = 16@.
-sqrtBody :: D (Double, Double) (Double, Double)
-sqrtBody = D $ \(x, a) ->
+sqrtBody :: Diff (Double, Double) (Double, Double)
+sqrtBody = Diff $ \(x, a) ->
   let x' = (x + a / x) / 2
       jx = (1 - a / (x * x)) / 2   -- ∂x'/∂x: vanishes at x = √a
       ja = 1 / (2 * x)             -- ∂x'/∂a
@@ -123,7 +135,7 @@ sqrtBody = D $ \(x, a) ->
 
 -- | traceNFrom forward pass converges to @sqrt(a)@.
 --
--- >>> let (yn, _) = runD (traceNFrom 8.0 20 sqrtBody) 16.0
+-- >>> let (yn, _) = runDiff (traceNFrom 8.0 20 sqrtBody) 16.0
 -- >>> abs (yn - 4.0) < 1e-10
 -- True
 
@@ -132,6 +144,6 @@ sqrtBody = D $ \(x, a) ->
 -- The Neumann series is one term long — at the fixed point @jx = 0@,
 -- so only the @ja@ path contributes.
 --
--- >>> let (_, pbn) = runD (traceNFrom 8.0 20 sqrtBody) 16.0
+-- >>> let (_, pbn) = runDiff (traceNFrom 8.0 20 sqrtBody) 16.0
 -- >>> abs (pbn 1.0 - 0.125) < 1e-10
 -- True

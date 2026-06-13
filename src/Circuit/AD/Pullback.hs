@@ -1,0 +1,155 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE UndecidableInstances #-}
+
+-- | Linear cotangent maps — the base arrow for reverse-mode gradients.
+--
+-- @Pullback b a@ is a linear map @b -> a@ read as an arrow from @b@
+-- (output cotangent) to @a@ (input cotangent).  Composition is plain
+-- function composition — the /reversal/ is not in this category, it is
+-- in how nets are built over it: 'Circuit.AD.linearizeAt' transposes a
+-- @Net Diff (,) a b@ into a @Net Pullback (,) b a@, emitting
+-- @Compose f' g'@ for every source @Compose g f@.  Within an arrow the
+-- chain rule is then just @(.)@.
+--
+-- This is the arrow that 'linearizeAt' builds: a 'Net' whose wires
+-- carry pullbacks rather than smooth maps.  It is the honest linear
+-- semantics behind reverse-mode AD, free of the second-derivative
+-- confusion that comes from trying to compose 'Diff' arrows directly.
+module Circuit.AD.Pullback
+  ( -- * Linear cotangent arrow
+    Pullback (..),
+
+    -- * Running a pullback net
+    evalPullback,
+  )
+where
+
+#ifdef __GLASGOW_HASKELL__
+import Control.Category
+#else
+import Circuit.Classes
+#endif
+
+import Circuit.Additive (Additive (..))
+import Circuit.Dup (Dup (..))
+import Circuit.Monoidal (MonoidalP (..))
+import Circuit.Net (Net, runNet)
+import Circuit.Traced (Trace (..))
+import Prelude hiding (id, (.))
+
+-- $setup
+-- >>> import Circuit.Additive (Additive (..))
+-- >>> import Circuit.Dup (Dup (..))
+-- >>> import Circuit.Monoidal (MonoidalP (..))
+-- >>> import Circuit.Net (Net (..))
+-- >>> import Circuit.Traced (Trace (..))
+-- >>> import Prelude hiding (id, (.))
+
+-- | A linear map from output cotangents to input cotangents, read as
+-- an arrow @b -> a@.
+--
+-- >>> let pb = Pullback (*2) :: Pullback Double Double
+-- >>> runPullback pb 3
+-- 6.0
+newtype Pullback b a = Pullback
+  { -- | Apply the pullback to an output cotangent.
+    runPullback :: b -> a
+  }
+
+instance Category Pullback where
+  id = Pullback id
+  Pullback g . Pullback f = Pullback (g . f)
+  {-# INLINE id #-}
+  {-# INLINE (.) #-}
+
+-- | Parallel composition pairs pullbacks independently; 'swapA' swaps
+-- the two cotangents.
+--
+-- >>> let f = Pullback (+1) :: Pullback Int Int
+-- >>> let g = Pullback (*2) :: Pullback Int Int
+-- >>> runPullback (parA f g) (3, 4)
+-- (4,8)
+instance MonoidalP Pullback where
+  parA (Pullback f) (Pullback g) = Pullback (\(b, d) -> (f b, g d))
+  {-# INLINE parA #-}
+
+  swapA = Pullback (\(b, a) -> (a, b))
+  {-# INLINE swapA #-}
+
+-- | The cartesian trace for pullbacks.
+--
+-- The body is a linear map @f :: (x, c) -> (x, b)@.  The traced
+-- pullback @c -> b@ solves the affine feedback equation in cotangent
+-- space:
+--
+-- > (dx, db) = f (dx, dc)
+--
+-- solved by the same lazy knot that 'Trace Diff (,)' uses.  For
+-- strict carriers with nonzero channel self-coupling this diverges,
+-- exactly as the lazy 'Diff' trace does.  Unlike the 'Diff' case,
+-- though, the equation here is /always affine/ — 'Pullback' arrows are
+-- linear by construction — so a knot over a star-semiring carrier can
+-- be eliminated outright ('NumHask' @star@ \/
+-- @Hasknum.Matrix.starMatrix@) rather than iterated.  See
+-- @Circuit.AD.Star@ for the closed forms.
+--
+-- >>> let body = Pullback (\(dx', dc) -> (2.0 * dc, dx')) :: Pullback (Double, Double) (Double, Double)
+-- >>> runPullback (trace body) 1.0
+-- 2.0
+instance Trace Pullback (,) where
+  trace (Pullback f) = Pullback $ \dc ->
+    let ~(dx, db) = f (dx, dc)
+     in db
+  {-# INLINE trace #-}
+
+  untrace (Pullback g) = Pullback $ \(x, dc) -> (x, g dc)
+  {-# INLINE untrace #-}
+
+-- | Pullback-instance of the copy/comonoid structure.
+--
+-- Copy's pullback is addition; discard's pullback is the zero
+-- cotangent.  These are not used by 'linearizeAt' (which encodes
+-- structural rows as 'Lift's to avoid channel-type constraints), but
+-- they make 'Pullback' a full bimonoid carrier.
+--
+-- >>> runPullback (dup :: Pullback Int (Int, Int)) 3
+-- (3,3)
+-- >>> runPullback (discard :: Pullback Int ()) 5
+-- ()
+--
+-- NOTE: unlike @Dup Diff@ (whose pullback genuinely needs 'plus'),
+-- neither method here uses the @Additive (->) a@ constraint — copying
+-- and discarding are linear as they stand.  If the 'Dup' class head
+-- permits, drop the constraint; keeping a stray @Additive@ here reads
+-- as \"addition happens in this instance\", which is exactly the
+-- confusion the paragraph above tries to dispel.
+instance Additive (->) a => Dup Pullback a where
+  dup = Pullback (\b -> (b, b))
+  {-# INLINE dup #-}
+
+  discard = Pullback (\_ -> ())
+  {-# INLINE discard #-}
+
+-- | Pullback-instance of the additive/monoid structure.
+--
+-- Addition's pullback is copying; zero's pullback is discarding.
+--
+-- >>> runPullback (plus :: Pullback (Int, Int) Int) (1, 2)
+-- 3
+-- >>> runPullback (zero :: Pullback () Int) ()
+-- 0
+instance Additive (->) a => Additive Pullback a where
+  plus = Pullback (\(b1, b2) -> plus (b1, b2))
+  {-# INLINE plus #-}
+
+  zero = Pullback (\() -> zero ())
+  {-# INLINE zero #-}
+
+-- | Evaluate a pullback net at a single output cotangent.
+--
+-- This is the one-shot reverse pass: the net was built by
+-- 'linearizeAt', and applying it to a cotangent @db@ yields the
+-- input cotangent @da@.
+evalPullback :: Net Pullback (,) b a -> b -> a
+evalPullback n db = runPullback (runNet n) db
+{-# INLINE evalPullback #-}

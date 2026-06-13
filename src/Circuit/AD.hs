@@ -1,16 +1,20 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -- | Reverse-mode automatic differentiation via a lens-shaped base arrow.
 --
--- 'D' is a differentiable function @a -> b@ that carries its own pullback:
+-- 'Diff' is a differentiable function @a -> b@ that carries its own pullback:
 -- given a cotangent @db@ on the output, produce a cotangent @da@ on the input.
 -- This is the same shape as Conal Elliott's \"Simple Essence of AD\" reverse
 -- mode, lifted into a 'Category' so it can be used as the base arrow for
 -- 'Circuit'.
 --
--- With the 'Trace' @(,)@ instance, 'reify' \"Circuit D\" runs forward and
--- pulls back — reverse-mode AD with no GADT changes.  The backward pass
+-- With the 'Trace' @(,)@ instance, 'reify' \"Circuit Diff\" runs forward and
+-- pulls back — reverse-mode ADiff with no GADT changes.  The backward pass
 -- through a 'Knot' uses a lazy fixpoint (the implicit function theorem):
 -- the gradient at a fixed point solves its own affine equation.
 --
@@ -21,18 +25,40 @@
 -- >>> import Circuit (Circuit(..), reify)
 -- >>> import Circuit.AD
 -- >>> import Prelude hiding (id, (.))
--- >>> let f = Lift (D (\x -> (x * x, \dx' -> 2 * x * dx'))) :: Circuit D (,) Double Double
--- >>> let (y, pullback) = runD (reify f) 3.0
+-- >>> let f = Lift (Diff (\x -> (x * x, \dx' -> 2 * x * dx'))) :: Circuit Diff (,) Double Double
+-- >>> let (y, pullback) = runDiff (reify f) 3.0
 -- >>> y
 -- 9.0
 -- >>> pullback 1.0
 -- 6.0
 module Circuit.AD
-  ( -- * Differentiable arrow
-    D (..),
+  ( -- * Untagged differentiable arrow
+    Diff,
+
+    -- * Tagged differentiable arrow
+    Diff' (..),
+
+    -- * Constructor pattern
+    pattern Diff,
+
+    -- * Runner
+    runDiff,
 
     -- * Trace variants
     traceNFrom,
+    traceStarFrom,
+    traceStar,
+
+    -- * Inspectable backprop
+    backprop,
+    linearizeAt,
+    fromDiffAt,
+
+    -- * Linear pullback arrow
+    Pullback,
+
+    -- * Smoke tests
+    quadD,
   )
 where
 
@@ -43,32 +69,58 @@ import Circuit.Classes
 #endif
 
 import Circuit.Additive (Additive (..))
+import Circuit.Circuit qualified as C
 import Circuit.Dup (Dup (..))
-import Circuit.Instances (MonoidalP (..))
+import Circuit.Monoidal (MonoidalP (..))
+import Circuit.Net (Net (..))
+import Circuit.Net qualified
+import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Traced (Trace (..))
+import NumHask.Algebra.Additive qualified as NHA
+import NumHask.Algebra.Multiplicative qualified as NHM
+import NumHask.Algebra.Ring qualified as NHR
 import Prelude hiding (id, (.))
 
 -- $setup
 -- >>> import Circuit (Circuit (..), reify)
 -- >>> import Prelude hiding (id, (.))
 
--- | A reverse-mode differentiable function.
+-- | A reverse-mode differentiable function tagged by a phantom type @p@.
 --
--- @runD f a@ returns a pair @(b, pullback)@ where @b = f a@ and @pullback@
+-- The phantom tag prevents perturbation confusion: values of type
+-- @Diff' p a b@ can only be composed with other @Diff' p@ values.  Nested
+-- AD introduces a fresh tag for each level.
+--
+-- @runDiff f a@ returns a pair @(b, pullback)@ where @b = f a@ and @pullback@
 -- maps a cotangent @db@ on the output to a cotangent @da@ on the input.
-newtype D a b = D
+newtype Diff' (p :: k) a b = Diff'
   { -- | Run the forward pass and return the backward pullback.
-    runD :: a -> (b, b -> a)
+    runDiff' :: a -> (b, b -> a)
   }
 
-instance Category D where
-  id = D (\a -> (a, id))
-  D f . D g = D $ \a ->
+-- | The untagged differentiable arrow.  Existing code can continue to use
+-- this; it is simply @Diff' ()@.
+type Diff = Diff' ()
+
+-- | Pattern synonym for the untagged constructor.  Use this or 'Diff'' to
+-- build a 'Diff'' value.
+pattern Diff :: (a -> (b, b -> a)) -> Diff' p a b
+pattern Diff f = Diff' f
+
+{-# COMPLETE Diff :: Diff' #-}
+
+-- | Run the forward pass and return the backward pullback.
+runDiff :: Diff' p a b -> a -> (b, b -> a)
+runDiff = runDiff'
+
+instance Category (Diff' p) where
+  id = Diff (\a -> (a, id))
+  Diff f . Diff g = Diff $ \a ->
     let (b, gb) = g a
         (c, fc) = f b
      in (c, gb . fc)
 
--- | 'Trace' for 'D' with the @(,)@ tensor.
+-- | 'Trace' for 'Diff' with the @(,)@ tensor.
 --
 -- The forward pass ties the standard lazy knot:
 --
@@ -93,8 +145,8 @@ instance Category D where
 -- because GHC's heap holds the graph.  For linear backward maps this is a
 -- Neumann series computed lazily; for general maps it is the implicit function
 -- theorem as a lazy knot.
-instance Trace D (,) where
-  trace (D body) = D $ \b ->
+instance Trace (Diff' p) (,) where
+  trace (Diff body) = Diff $ \b ->
     let -- Forward: standard lazy knot
         ~((a, c), backward) = body (a, b)
         -- Backward: same shape, transposed — knot through the pair
@@ -103,9 +155,89 @@ instance Trace D (,) where
            in snd bd
      in (c, pullback)
 
-  untrace (D f) = D $ \(a, b) ->
+  untrace (Diff f) = Diff $ \(a, b) ->
     let (c, back) = f b
      in ((a, c), \(da, dc) -> (da, back dc))
+
+-- | Trace for 'Diff' with the 'Either' tensor.
+--
+-- The 'Either' trace is a while-loop: 'Left a' means "iterate again",
+-- 'Right c' means "return".  Forward pass runs until the body produces a
+-- 'Right', recording each body's pullback.  Backward pass replays those
+-- pullbacks in reverse order, propagating the output cotangent back through
+-- the iteration chain.
+--
+-- The number of iterations is treated as locally constant by the derivative:
+-- small perturbations of the input do not change the branch sequence.  This
+-- is the standard reverse-mode treatment of data-dependent control flow.
+--
+-- __Proof obligation__ (joins the linearity obligation on the other
+-- traces): a cotangent on a sum is represented as the /same/ sum, and
+-- its tag must match the primal trajectory — the cotangent space at a
+-- point of @Either a c@ is the cotangent space of the branch the point
+-- is in.  Every honest pullback maps an output-tagged cotangent to an
+-- input-tagged one; the replay errors loudly on any mismatch rather
+-- than misreading a dishonest primitive.
+--
+-- A loop with an exact hand-computable derivative — double three
+-- times (channel carries @(countdown, acc)@), so @y = 8x@:
+--
+-- >>> :{
+-- let step = Diff (\e -> case e of
+--       Right x -> (Left (3 :: Double, x :: Double), \de -> case de of
+--         Left (_, dv) -> Right dv
+--         Right _ -> error "tag")
+--       Left (k, v)
+--         | k <= 0 -> (Right v, \de -> case de of
+--             Right dc -> Left (0, dc)
+--             Left _ -> error "tag")
+--         | otherwise -> (Left (k - 1, 2 * v), \de -> case de of
+--             Left (dk, dv) -> Left (dk, 2 * dv)
+--             Right _ -> error "tag"))
+-- :}
+--
+-- >>> let (y, pb) = runDiff (trace step) 1.5
+-- >>> y
+-- 12.0
+-- >>> pb 1.0
+-- 8.0
+instance Trace (Diff' p) Either where
+  trace (Diff body) = Diff $ \b ->
+    let -- Forward: iterate, collecting pullbacks in execution order.
+        goFwd x =
+          let (y, pb) = body x
+           in case y of
+                Right c' -> (c', [pb])
+                Left a ->
+                  let (c', pbs') = goFwd (Left a)
+                   in (c', pb : pbs')
+        (c, pbs) = goFwd (Right b)
+        -- Reverse the tape once; shared across all cotangents.
+        rpbs = reverse pbs
+        -- Backward: replay pullbacks in reverse order.
+        pullback dc =
+          case rpbs of
+            [] -> error "Circuit.AD.Trace Diff Either: empty loop (impossible)"
+            (lastPb : prevPbs) -> goBwd (lastPb (Right dc)) prevPbs
+          where
+            goBwd (Right db) [] = db
+            goBwd (Left _) [] =
+              error "Circuit.AD.Trace Diff Either: final cotangent landed on Left (impossible)"
+            goBwd (Left da) (pb : pbs') = goBwd (pb (Left da)) pbs'
+            goBwd (Right _) (_ : _) =
+              -- A Right-tagged cotangent with pullbacks still pending means
+              -- some pullback at iteration i > 1 claimed its input was the
+              -- exit branch — but that iteration's primal input was 'Left'.
+              -- Returning here would silently skip the remaining chain rule,
+              -- so this is a dishonest primitive, not an early exit.
+              error "Circuit.AD.Trace Diff Either: Right cotangent mid-chain (tag-dishonest pullback)"
+     in (c, pullback)
+
+  untrace (Diff f) = Diff $ \case
+    Left a -> (Left a, \case Left da -> Left da; Right _ -> error "untrace: Left input, Right cotangent")
+    Right b ->
+      let (c, back) = f b
+       in (Right c, \case Right dc -> Right (back dc); Left _ -> error "untrace: Right input, Left cotangent")
 
 -- | Iterated trace for strict carriers.
 --
@@ -129,9 +261,9 @@ traceNFrom ::
   Additive (->) a =>
   a ->
   Int ->
-  D (a, b) (a, c) ->
-  D b c
-traceNFrom x0 n (D body) = D $ \b ->
+  Diff' p (a, b) (a, c) ->
+  Diff' p b c
+traceNFrom x0 n (Diff body) = Diff $ \b ->
   let -- Forward: iterate from caller-supplied seed
       stepFwd x = let ((x', _), _) = body (x, b) in x'
       a = iterate stepFwd x0 !! n
@@ -144,54 +276,301 @@ traceNFrom x0 n (D body) = D $ \b ->
    in (c, pullback)
 
 -- ---------------------------------------------------------------------------
--- Dup D — copy and discard for the differentiable arrow.
+-- StarSemiring — the principled Neumann index
+-- ---------------------------------------------------------------------------
+
+-- | Trace with a closed-form backward pass via the Kleene 'NHR.star'.
 --
--- In D, the bimonoid is self-dual under differentiation: copy's pullback
+-- The integer @n@ in 'traceNFrom' truncates a series on /both/ passes.
+-- But only the forward fixpoint is genuinely nonlinear; the backward
+-- channel equation is affine — calculus promises linearity in
+-- cotangents:
+--
+-- > da = A·da + C·dc        solution:  da = star A · C·dc
+--
+-- with @star a = one + a·star a@ — the Neumann series as algebra,
+-- @1\/(1−a)@ over a field.  Because the pullback is linear, the
+-- blocks A and C·dc are /extractable by probing/:
+--
+-- > backward (dj, dc) = (A·dj + C·dc, B·dj + D·dc)
+-- > A    = fst (backward (one,  0))   -- channel self-coupling
+-- > C·dc = fst (backward (zero, dc))
+--
+-- and the trace's pullback is the Schur complement
+-- @D·dc + B·star A·C·dc@, recovered with one more probe at the
+-- backward fixpoint:
+--
+-- > db = snd (backward (star A · C·dc, dc))
+--
+-- (Check: @A·(star A·C·dc) + C·dc = (A·star A + one)·C·dc
+-- = star A·C·dc@ — the star law discharges the fixpoint.)
+--
+-- So: forward still iterates from the caller's seed (no closed form
+-- exists for an arbitrary nonlinear fixpoint), but the backward pass
+-- is /exact/ in three calls to @backward@ — no Neumann index at all.
+-- The @star@ probe is computed once per forward point and shared
+-- across all cotangents.
+--
+-- The closed form is the truncated iteration's limit; pure-Prelude
+-- witness at @a = 0.3@, @c = 2@:
+--
+-- >>> let daIter = iterate (\d -> 0.3 * d + 2.0 * 1.0) 0 !! 200
+-- >>> abs (daIter - 1.0 / (1.0 - 0.3) * 2.0) < 1e-12
+-- True
+--
+-- __Caveat__: @numhask@ declares 'NHR.StarSemiring' but ships no
+-- instances; the only carriers in the tower are
+-- @Hasknum.Matrix.FieldStar@ (@star a = recip (1−a)@), @Warshall@,
+-- and @MinPlus@.  For bare 'Double' channels and for /vector/
+-- channels solved by @Hasknum.Matrix.starMatrix@, see
+-- @Circuit.AD.Star@ — the Schur-complement bridge proper.
+--
+-- __Proof obligation__: the probes assume the pullback is linear.
+-- Every honestly-constructed 'Diff' primitive satisfies this (a
+-- pullback /is/ a linear map); a primitive whose backward closure is
+-- affine-with-offset is a bug that this function will silently
+-- misread.
+traceStarFrom ::
+  (NHR.StarSemiring j, Additive (->) c) =>
+  -- | forward seed
+  j ->
+  -- | forward iteration count
+  Int ->
+  Diff' p (j, b) (j, c) ->
+  Diff' p b c
+traceStarFrom x0 n (Diff body) = Diff $ \b ->
+  let -- Forward: iterate from caller-supplied seed (as 'traceNFrom')
+      stepFwd x = let ((x', _), _) = body (x, b) in x'
+      a = iterate stepFwd x0 !! n
+      ((_, c), backward) = body (a, b)
+      -- Probe the channel self-coupling once; star it in closed form
+      aStar = NHR.star (fst (backward (NHM.one, zero ())))
+      -- Backward: exact in two more probes — no iteration
+      pullback dc =
+        let cdc = fst (backward (NHA.zero, dc))
+         in snd (backward (aStar NHM.* cdc, dc))
+   in (c, pullback)
+
+-- | Trace via the Kleene star — the execution formula, lazy form.
+--
+-- For a knot body with channel self-coupling block A and cross-blocks
+-- B, C, D, the trace is the Schur complement:
+--
+-- > traceStar f = D + B · star A · C
+--
+-- The lazy 'trace' instance for 'Diff' computes exactly this via a
+-- lazy fixpoint rather than closed form, so this alias is definable
+-- without using 'NHR.star' at all — the constraint records the
+-- /semantics/, not the implementation.  Note that @numhask@ ships no
+-- 'NHR.StarSemiring' instances, so for concrete carriers prefer
+-- 'traceStarFrom' (scalar channel, closed-form backward) or
+-- @Circuit.AD.Star.traceStarMatrix@ (vector channel, solved by
+-- @Hasknum.Matrix.starMatrix@ — the bridge made literal).
+traceStar :: (NHR.StarSemiring j) => Diff' p (j, b) (j, c) -> Diff' p b c
+traceStar = trace
+
+-- | Pointwise linearization: run a 'Net Diff' forward at @a@ and
+-- build the transposed net of pullbacks.
+--
+-- This is the same operation as /backpropagation/, but read forwards
+-- through the lens of 'linearize': the graph's structure is burned down
+-- into a straight linear (affine) cotangent map.  'backprop' is the dual
+-- view — looking backwards, the single output cotangent appears to
+-- bifurcate and fan out through the wiring.  Propagate fans values out in
+-- the forward direction; linearize straightens them into a wire in the
+-- reverse direction.
+--
+-- This is the honest reverse-mode gradient net.  'transpose' alone is
+-- only correct for linear nets; for nonlinear 'Diff' primitives the
+-- pullback closure depends on the primal point.  'linearizeAt' runs
+-- the net, captures each primitive's pullback at the point it saw,
+-- and returns both the output value and a 'Net Pullback' whose wires
+-- are those pointwise pullbacks composed in reverse order.
+--
+-- Use 'Circuit.AD.Pullback.evalPullback' to evaluate the resulting net
+-- at a single output cotangent.
+--
+-- __Caveat__: /Fixpoints are lazy on both passes./  Forward 'Knot's tie
+-- the same lazy knot as 'Trace' @Diff@; the 'Knot's in the returned net
+-- tie the lazy 'Trace' @Pullback@ knot.  For strict carriers with
+-- nonzero channel self-coupling, /both/ diverge.  The forward side needs
+-- an iteration policy (a @backpropNFrom@, mirroring 'traceNFrom').  The
+-- backward side deserves better: the pullback net is linear by
+-- construction, so its knots satisfy affine equations and can be
+-- /eliminated/ — probe the knot body for its channel matrix,
+-- 'Hasknum.Matrix.starMatrix' it, and replace the 'Knot' with a 'Lift'.
+-- That elimination pass is state elimination on a linear circuit: the
+-- linear-representation normal form that @kleeneSimplify@ gestures at,
+-- landing where it can actually be lawful.
+--
+-- >>> import Circuit.Net (Net (..))
+-- >>> import Circuit.AD.Pullback (evalPullback)
+-- >>> let sq = Diff (\x -> (x * x, \d -> 2 * x * d))
+-- >>> let n = Compose Add (Compose (Par (Lift sq) (Lift sq)) Copy) :: Net Diff (,) Double Double
+-- >>> let (y, g) = backprop n 3.0
+-- >>> y
+-- 18.0
+-- >>> evalPullback g 1.0
+-- 12.0
+backprop ::
+  forall p a b.
+  Net (Diff' p) (,) a b ->
+  a ->
+  (b, Net Pullback (,) b a)
+backprop = linearizeAt
+
+-- | Capture the pullback of a 'Diff' primitive at a primal point.
+--
+-- >>> let d = Diff (\x -> (x * x, \dy -> 2 * x * dy))
+-- >>> runPullback (fromDiffAt d 3) 1
+-- 6
+fromDiffAt :: forall p a b. Diff' p a b -> a -> Pullback b a
+fromDiffAt (Diff f) a = Pullback (snd (f a))
+{-# INLINE fromDiffAt #-}
+
+-- | Run a 'Net Diff' forward and build the transposed pullback net.
+--
+-- This linearizes the 'Net' directly, without 'Circuit.Net.forget', so
+-- 'Knot's inside 'Par' arms survive as 'Knot's in the pullback net.
+linearizeAt ::
+  forall p a b.
+  Net (Diff' p) (,) a b ->
+  a ->
+  (b, Net Pullback (,) b a)
+linearizeAt = linearizeNet
+
+-- | Pointwise linearization over the free 'Net' language.
+--
+-- 'Par' is preserved as 'Par'.  Structural rows ('Copy', 'Add',
+-- 'Discard', 'Zero') are converted to point-independent 'Lift'
+-- pullbacks using the 'Diff' dictionaries the constructors already
+-- carry (copy↦plus, add↦dup, discard↦zero, zero↦discard).  Because the
+-- recursion never melts the net into a 'Circuit' first, feedback loops
+-- under 'Par' remain visible to future star-elimination passes.
+linearizeNet ::
+  forall p a b.
+  Net (Diff' p) (,) a b ->
+  a ->
+  (b, Net Pullback (,) b a)
+linearizeNet n a = case n of
+  Lift d ->
+    let (b, pb) = runDiff d a
+     in (b, Lift (Pullback pb))
+  Compose g f ->
+    let (b, f') = linearizeNet f a
+        (c, g') = linearizeNet g b
+     in (c, Compose f' g')
+  Par f g ->
+    let (a1, a2) = a
+        (b, f') = linearizeNet f a1
+        (d, g') = linearizeNet g a2
+     in ((b, d), Par f' g')
+  Swap ->
+    let (x, y) = a
+     in ((y, x), Swap)
+  Copy ->
+    ((a, a), Lift (Pullback (\(db1, db2) -> fst (runDiff (plus @(Diff' p) @a) (db1, db2)))))
+  Discard ->
+    ((), Lift (Pullback (\_ -> fst (runDiff (zero @(Diff' p) @a) ()))))
+  Add ->
+    let (x, y) = a
+     in (fst (runDiff (plus @(Diff' p) @b) (x, y)), Lift (Pullback (\dc -> (dc, dc))))
+  Zero ->
+    (fst (runDiff (zero @(Diff' p) @b) ()), Lift (Pullback (\_ -> ())))
+  Knot f ->
+    let ~((x, b), f') = linearizeNet f (x, a)
+     in (b, Knot f')
+
+-- | Pointwise linearization over the core 'Circuit' language.  The
+-- bimonoid rows ('Copy', 'Add', ...) have already been melted into
+-- 'Lift's by 'Circuit.Net.forget', so this recursion only sees 'Lift',
+-- 'Compose', and 'Knot'.
+linearizeCircuit ::
+  forall p a b.
+  C.Circuit (Diff' p) (,) a b ->
+  a ->
+  (b, Net Pullback (,) b a)
+linearizeCircuit (C.Lift (Diff f)) a =
+  let (b, pb) = f a
+   in (b, Lift (Pullback pb))
+linearizeCircuit (C.Compose g f) a =
+  let (b, f') = linearizeCircuit f a
+      (c, g') = linearizeCircuit g b
+   in (c, Compose f' g')
+linearizeCircuit (C.Knot f) a =
+  let ~((x, b), f') = linearizeCircuit f (x, a)
+   in (b, Knot f')
+
+-- ---------------------------------------------------------------------------
+-- Dup Diff — copy and discard for the differentiable arrow.
+--
+-- In Diff, the bimonoid is self-dual under differentiation: copy's pullback
 -- is plus, discard's pullback is zero, plus's pullback is dup, zero's
 -- pullback is discard.  transpose's Copy ↔ Add, Discard ↔ Zero table is
--- not a rule imposed on syntax — it's the instance structure of D read
+-- not a rule imposed on syntax — it's the instance structure of Diff read
 -- off at the semantic level.
 
 -- | Copy in D: the pullback is 'plus' (fan-in on the backward pass).
 --
--- >>> import Circuit.Instances (MonoidalP(..))
+-- >>> import Circuit.Monoidal (MonoidalP(..))
 -- >>> import Circuit.Dup (Dup(..))
--- >>> let (_, pb) = runD (dup :: D Int (Int, Int)) 5
+-- >>> let (_, pb) = runDiff (dup :: Diff Int (Int, Int)) 5
 -- >>> pb (1, 2)
 -- 3
-instance Additive (->) a => Dup D a where
-  dup = D (\a -> ((a, a), plus))
+instance Additive (->) a => Dup (Diff' p) a where
+  dup = Diff (\a -> ((a, a), plus))
   {-# INLINE dup #-}
 
-  discard = D (\a -> ((), \() -> zero ()))
+  discard = Diff (\a -> ((), \() -> zero ()))
   {-# INLINE discard #-}
 
 -- | Add in D: the pullback is 'dup' (fan-out on the backward pass).
 --
--- >>> let (_, pb) = runD (plus :: D (Int, Int) Int) (3, 4)
+-- >>> let (_, pb) = runDiff (plus :: Diff (Int, Int) Int) (3, 4)
 -- >>> pb 1
 -- (1,1)
-instance Additive (->) a => Additive D a where
-  plus = D (\(a, b) -> (plus (a, b), \d -> (d, d)))
+instance Additive (->) a => Additive (Diff' p) a where
+  plus = Diff (\(a, b) -> (plus (a, b), \d -> (d, d)))
   {-# INLINE plus #-}
 
-  zero = D (\() -> (zero (), \_ -> ()))
+  zero = Diff (\() -> (zero (), \_ -> ()))
   {-# INLINE zero #-}
 
--- | Monoidal product for D: independent wires, no additive constraint.
+-- | Monoidal product for Diff: independent wires, no additive constraint.
 --
--- >>> let f = D (\x -> (x + 1, \d -> d)) :: D Int Int
--- >>> let g = D (\x -> (x * 2, \d -> 2 * d)) :: D Int Int
--- >>> let (y, pb) = runD (parA f g) (3, 4)
+-- >>> let f = Diff (\x -> (x + 1, \d -> d)) :: Diff Int Int
+-- >>> let g = Diff (\x -> (x * 2, \d -> 2 * d)) :: Diff Int Int
+-- >>> let (y, pb) = runDiff (parA f g) (3, 4)
 -- >>> y
 -- (4,8)
 -- >>> pb (1, 1)
 -- (1,2)
-instance MonoidalP D where
-  parA (D f) (D g) = D $ \(a, c) ->
+instance MonoidalP (Diff' p) where
+  parA (Diff f) (Diff g) = Diff $ \(a, c) ->
     let (b, fb) = f a; (d, gd) = g c
      in ((b, d), \(db, dd) -> (fb db, gd dd))
   {-# INLINE parA #-}
 
-  swapA = D (\(a, b) -> ((b, a), \(db, da) -> (da, db)))
+  swapA = Diff (\(a, b) -> ((b, a), \(db, da) -> (da, db)))
   {-# INLINE swapA #-}
+
+-- ---------------------------------------------------------------------------
+-- Smoke test: quadratic — the term that was impossible in Stage 1
+-- ---------------------------------------------------------------------------
+
+-- | @2x² + 3x + 5@ built from 'parA', 'dup', and 'plus' on the @Diff@ arrow.
+-- No 'Net' needed — the instances are the denotations the rows will reify to.
+--
+-- The gradient is @4x + 3@, so at @x = 1@: value 10, gradient 7.
+--
+-- >>> let (y, pb) = runDiff quadD 1.0
+-- >>> y
+-- 10.0
+-- >>> pb 1.0
+-- 7.0
+quadD :: Diff' p Double Double
+quadD = plus . parA sq lin . dup
+  where
+    sq  = Diff (\x -> (2*x*x,   \d -> 4*x*d))
+    lin = Diff (\x -> (3*x + 5, \d -> 3*d))
+
