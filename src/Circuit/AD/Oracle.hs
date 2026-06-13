@@ -45,7 +45,7 @@ import Prelude hiding (id, (.))
 -- 2
 -- >>> import Control.Category ((>>>))
 -- >>> import Circuit (Circuit(..), reify)
--- >>> import Circuit.AD (Diff(..), traceNFrom)
+-- >>> import Circuit.AD (Diff, Diff' (..), pattern Diff, traceNFrom)
 -- >>> import Numeric.AD.DelCont (rad1)
 -- >>> import Prelude hiding (id, (.))
 

@@ -11,7 +11,6 @@ import Circuit.AD (Diff, Diff' (..), backprop, pattern Diff)
 import Circuit.AD.Eliminate (eliminateKnots)
 import NumHask.Diff ()
 import Circuit.AD.Pullback (Pullback (..), evalPullback)
-import Data.Proxy (Proxy (..))
 import NumHask.Free.Carriers (FieldStar (..))
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
@@ -44,7 +43,7 @@ scalarKnot =
 runStarEliminateTests :: IO ()
 runStarEliminateTests = do
   putStrLn "Star-eliminate scalar pullback knot"
-  let eliminated = eliminateKnots (Proxy :: Proxy FieldStar) scalarKnot
+  let eliminated = eliminateKnots (FieldStar 0) scalarKnot
       FieldStar g1 = evalPullback eliminated (FieldStar 1.0)
       FieldStar g3 = evalPullback eliminated (FieldStar 3.0)
   assert "eliminated scalar gradient" g1 4.0
@@ -73,7 +72,7 @@ runStarEliminateTests = do
               ) ::
               ([FieldStar], FieldStar)
       vecKnot = Knot (Lift vecBody) :: Net Pullback (,) FieldStar FieldStar
-      eliminatedVec = eliminateKnots (Proxy :: Proxy [FieldStar]) vecKnot
+      eliminatedVec = eliminateKnots [FieldStar 0, FieldStar 0] vecKnot
       FieldStar gVec = evalPullback eliminatedVec (FieldStar 1.0)
       expectedVec = (30.0 / 11.0) + (40.0 / 11.0) + 1.0
   assert "eliminated vector gradient" gVec expectedVec
@@ -82,14 +81,14 @@ runStarEliminateTests = do
   let copiedKnot =
         Compose Add (Compose (Par scalarKnot scalarKnot) Copy) ::
           Net Pullback (,) FieldStar FieldStar
-      eliminatedCopy = eliminateKnots (Proxy :: Proxy FieldStar) copiedKnot
+      eliminatedCopy = eliminateKnots (FieldStar 0) copiedKnot
       FieldStar gCopy = evalPullback eliminatedCopy (FieldStar 1.0)
   assert "melted copy-add around knot" gCopy 8.0
 
   putStrLn "Star-eliminate via composition"
   let scale3 = Lift (Pullback (\(FieldStar x) -> FieldStar (3.0 * x)))
       nested = Compose scale3 scalarKnot :: Net Pullback (,) FieldStar FieldStar
-      eliminatedNested = eliminateKnots (Proxy :: Proxy FieldStar) nested
+      eliminatedNested = eliminateKnots (FieldStar 0) nested
       FieldStar gNested = evalPullback eliminatedNested (FieldStar 1.0)
   assert "composition" gNested 12.0
 
@@ -108,7 +107,7 @@ runStarEliminateTests = do
           Diff' () (FieldStar, FieldStar) (FieldStar, FieldStar)
       innerKnot = Knot (Lift innerBody) :: Net (Diff' ()) (,) FieldStar FieldStar
       (FieldStar y, g) = backprop innerKnot (FieldStar 4.0)
-      gElim = eliminateKnots (Proxy :: Proxy FieldStar) g
+      gElim = eliminateKnots (FieldStar 0) g
       FieldStar gLazy = evalPullback g (FieldStar 1.0)
       FieldStar gElimVal = evalPullback gElim (FieldStar 1.0)
   assert "lazy-knot value" y 4.0

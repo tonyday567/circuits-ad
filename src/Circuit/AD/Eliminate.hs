@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -10,9 +11,13 @@
 -- ('NumHask.Algebra.Ring.StarSemiring' for scalar channels,
 -- 'Circuit.AD.Matrix.starMatrix' for vector channels).
 --
--- The resulting net has no 'Knot' constructors, so it can be evaluated on
--- strict carriers without the lazy-knot divergence that 'Trace Pullback (,)'
--- suffers when channel self-coupling is non-zero.
+-- The pass is /structural/: it recurses through the net, replaces each
+-- 'Knot' (innermost first — Bekić order) with a single solved 'Lift', and
+-- leaves every other constructor in place.  The result preserves the net's
+-- shape minus its loops, so it can be evaluated on strict carriers without
+-- the lazy-knot divergence that 'Trace' @Pullback (,)@ suffers when channel
+-- self-coupling is non-zero — and it remains inspectable: the only opaque
+-- nodes are the ones Gaussian elimination genuinely created.
 module Circuit.AD.Eliminate
   ( -- * Channel abstraction
     StarChannel (..),
@@ -24,12 +29,9 @@ where
 
 import Circuit.AD.Melt (melt)
 import Circuit.AD.Pullback (Pullback (..))
-import Circuit.Dagger (Additive (..), Dup (..))
-import Circuit.Monoidal (MonoidalP (..))
-import Circuit.Net (Net (..))
-import Control.Category (Category (..))
-import Data.Proxy (Proxy (..))
+import Circuit.Net (Net (..), runNet)
 import Circuit.AD.Matrix (Matrix (..), matVec, starMatrix)
+import Circuit.Dagger qualified
 import NumHask.Free.Carriers (FieldStar (..))
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
@@ -38,10 +40,21 @@ import Prelude hiding (id, (.))
 import Prelude qualified as P
 import Unsafe.Coerce (unsafeCoerce)
 
+-- $setup
+-- >>> import Circuit.AD.Pullback (Pullback (..), evalPullback)
+-- >>> import Circuit.Net (Net (..))
+-- >>> import NumHask.Free.Carriers (FieldStar (..))
+-- >>> import Prelude hiding (id, (.))
+
 -- | Feedback channels that support star-elimination.
 --
 -- The class abstracts over scalar and vector channels.  For a scalar channel
 -- the self-coupling is a single scalar; for a vector channel it is a matrix.
+--
+-- Channel arithmetic ('addChannel', 'negateChannel') is part of the class
+-- rather than an @Additive (->) j@ constraint: only 'addChannel' is ever needed
+-- (never a dimension-blind @zero ()@), and list channels could not lawfully
+-- supply the latter.
 class
   ( NHR.StarSemiring (Scalar j),
     NHA.Additive (Scalar j),
@@ -53,37 +66,48 @@ class
   -- type of a list).
   type Scalar j
 
-  -- | Dimension of the channel cotangent space.
+  -- | Dimension of the channel cotangent space, read off a witness value.
   channelDim :: j -> Int
 
   -- | Zero channel cotangent of the given dimension.
   zeroChannel :: Int -> j
 
-  -- | Basis vector @e_i@ of the given dimension.
+  -- | Basis vector @e_i@: @basisChannel dim i@.
   basisChannel :: Int -> Int -> j
 
-  -- | Build the self-coupling matrix of a linear map @j -> j@ by probing
-  -- each basis vector.
-  selfMatrix :: (j -> j) -> Matrix (Scalar j)
-
-  -- | Apply a matrix to a channel cotangent.
-  applyMatrix :: Matrix (Scalar j) -> j -> j
+  -- | Componentwise sum of two (full-length) channel cotangents.
+  addChannel :: j -> j -> j
 
   -- | Additive inverse of a channel cotangent.
   negateChannel :: j -> j
 
--- | One-dimensional channel over a 'StarSemiring' scalar.
+  -- | Build the self-coupling matrix of a linear map @j -> j@ by probing
+  -- each basis vector of the /given/ dimension.  The dimension is explicit:
+  -- it cannot be recovered from the map itself (probing requires a
+  -- well-formed input, and strict channels reject under-length ones).
+  selfMatrix :: Int -> (j -> j) -> Matrix (Scalar j)
+
+  -- | Apply a matrix to a channel cotangent.
+  applyMatrix :: Matrix (Scalar j) -> j -> j
+
+-- | One-dimensional channel over a 'NHR.StarSemiring' scalar.
 instance StarChannel FieldStar where
   type Scalar FieldStar = FieldStar
   channelDim _ = 1
   zeroChannel _ = NHA.zero
   basisChannel _ _ = NHM.one
-  selfMatrix f = Matrix [[f NHM.one]]
-  applyMatrix (Matrix [[s]]) v = s NHM.* v
-  applyMatrix _ _ = error "Circuit.AD.Eliminate.applyMatrix: scalar channel expected a 1x1 matrix"
+  addChannel (FieldStar x) (FieldStar y) = FieldStar (x P.+ y)
   negateChannel (FieldStar x) = FieldStar (P.negate x)
+  selfMatrix _ f = Matrix [[f NHM.one]]
+  applyMatrix (Matrix [[s]]) v = s NHM.* v
+  applyMatrix _ _ =
+    error "Circuit.AD.Eliminate.applyMatrix: scalar channel expected a 1x1 matrix"
 
 -- | n-dimensional channel as a list of scalar cotangents.
+--
+-- Requires 'NHA.Subtractive' on the element for 'negateChannel' — note that
+-- @numhask-free@'s 'FieldStar' already carries this instance, so @[FieldStar]@
+-- channels are usable here.
 instance
   ( NHR.StarSemiring a,
     NHA.Additive a,
@@ -96,131 +120,111 @@ instance
   channelDim = length
   zeroChannel n = replicate n NHA.zero
   basisChannel n i = [if k == i then NHM.one else NHA.zero | k <- [0 .. n - 1]]
-  selfMatrix f =
-    let n = channelDim (f [])
-        cols = [f (basisChannel n i) | i <- [0 .. n - 1]]
+  addChannel = zipWith (NHA.+)
+  negateChannel = fmap NHA.negate
+  selfMatrix n f =
+    let cols = [f (basisChannel n i) | i <- [0 .. n - 1]]
      in Matrix [[col !! k | col <- cols] | k <- [0 .. n - 1]]
   applyMatrix = matVec
-  negateChannel = fmap NHA.negate
 
--- | 'FieldStar' is a numeric carrier, so it can be the additive monoid used
--- by structural rows when they appear inside an eliminable net.
-instance Additive (->) FieldStar where
+-- | 'FieldStar' as a numeric carrier for circuits' additive structure, so
+-- hand-built nets can use structural rows at 'FieldStar' types.  (Nets from
+-- 'Circuit.AD.linearizeNet' never need this — their structural rows are
+-- already 'Lift's.)  Deliberately orphan: this module is the federation
+-- seam between @circuits@ and @numhask-free@.
+instance Circuit.Dagger.Additive (->) FieldStar where
   plus (FieldStar x, FieldStar y) = FieldStar (x P.+ y)
   zero _ = FieldStar 0
 
--- | A cotangent arrow that carries the same information as 'Pullback' but is
--- tagged so that its 'Knot' nodes can be solved by the Kleene star.
-newtype StarPullback b a = StarPullback
-  { runStarPullback :: b -> a
-  }
-
-instance Category StarPullback where
-  id = StarPullback id
-  StarPullback g . StarPullback f = StarPullback (g . f)
-
-instance MonoidalP StarPullback where
-  parA (StarPullback f) (StarPullback g) =
-    StarPullback (\(a, c) -> (f a, g c))
-  swapA = StarPullback (\(a, b) -> (b, a))
-
--- | Structural fan-out / fan-in on 'StarPullback'.
-instance Additive (->) a => Dup StarPullback a where
-  dup = StarPullback (\a -> (a, a))
-  discard = StarPullback (\_ -> ())
-
--- | Addition and zero on 'StarPullback'.
-instance Additive (->) a => Additive StarPullback a where
-  plus = StarPullback (\(a, b) -> plus (a, b))
-  zero = StarPullback (\_ -> zero ())
-
--- | Solve an affine @(,)@ knot in closed form.
+-- | Solve one affine knot body in closed form.
 --
--- For a knot body @f :: (j, c) -> (j, b)@, the channel self-coupling @A@
--- satisfies @dx = A·dx + C·dc@, whose solution is @dx = star A · C·dc@.
--- The traced arrow returns @db@ directly.
-traceStarPullback ::
-  (StarChannel j, Additive (->) j) =>
-  StarPullback (j, c) (j, b) ->
-  StarPullback c b
-traceStarPullback (StarPullback body) = StarPullback $ \dc ->
-  let zeroJ0 = zeroChannel 0
-      cdc = fst (body (zeroJ0, dc))
-      aMat =
-        selfMatrix
-          ( \dj ->
-              plus
-                (fst (body (dj, dc)), negateChannel (fst (body (zeroJ0, dc))))
-          )
-      da = applyMatrix (starMatrix aMat) cdc
-   in snd (body (da, dc))
-
--- | Eliminate all @(,)@ knots in a linear pullback net.
+-- For a body @f :: (j, c) -> (j, b)@ (channel cotangent, output cotangent),
+-- affinity gives @f₁ (dj, dc) = A·dj + C·dc@.  The probes:
 --
--- The channel type is passed explicitly because it is existentially
--- quantified inside 'Knot'.  In nets produced by 'linearizeNet' all knots
--- share the same channel, so 'unsafeCoerce' is safe: it only reveals the
--- channel type that the caller already knows.
+-- > C·dc = f₁ (0, dc)                       -- one call, at the true zero
+-- > A·e_i = f₁ (e_i, dc) − C·dc             -- offset-subtracted: valid at dc ≠ 0
+-- > dj   = star A · C·dc                    -- starMatrix
+-- > db   = f₂ (dj, dc)                      -- one final call
+--
+-- The offset subtraction is what lets every probe run at the /actual/
+-- cotangent @dc@, so no @zero@ for the (existential) type @c@ is ever
+-- needed.  Cost: @dim + 2@ body calls per cotangent; the star is /not/
+-- shared across cotangents — that is the price of the existential.
+solveAffine ::
+  (StarChannel j) =>
+  Int ->
+  ((j, c) -> (j, b)) ->
+  c ->
+  b
+solveAffine dim body dc =
+  let zeroJ = zeroChannel dim
+      cdc = fst (body (zeroJ, dc))
+      negCdc = negateChannel cdc
+      aMat = selfMatrix dim (\dk -> addChannel (fst (body (dk, dc))) negCdc)
+      dj = applyMatrix (starMatrix aMat) cdc
+   in snd (body (dj, dc))
+
+-- | Eliminate all @(,)@ knots in a linear pullback net, structurally.
+--
+-- Structural rows are melted first ('Circuit.AD.Melt.melt'); then the
+-- recursion replaces each 'Knot' — innermost first, so a knot body handed
+-- to 'solveAffine' is already loop-free and can be evaluated by plain
+-- 'runNet' — with one solved 'Lift'.  Everything else keeps its shape.
+--
+-- __The channel witness__: pass a sample channel cotangent (its value is
+-- irrelevant; its /dimension/ is read with 'channelDim').  The channel type
+-- inside 'Knot' is existential, so the witness is matched by 'unsafeCoerce'.
+--
+-- __Precondition (caller-checked, not machine-checked)__: every knot in the
+-- net has channel type @j@ with the witness's dimension.  This holds for
+-- single-loop nets from 'Circuit.AD.linearizeNet' over a @j@ channel; it is
+-- /not/ guaranteed for arbitrary nets — distinct knots may close over
+-- distinct channel types, and a mismatched coercion is undefined behaviour.
+-- The principled fix is evidence on the row: a 'StarChannel' dictionary
+-- captured by the 'Knot' constructor at linearization time, which would
+-- delete both the witness argument and the coercion.  That is a @circuits@
+-- GADT decision, not patchable from this module.
+--
+-- A self-coupled scalar loop the lazy trace diverges on, solved exactly
+-- (@dj = 0.3·dj + 2·dc@, @db = dj@, so @db\/dc = 2\/0.7@):
+--
+-- >>> :{
+-- let body (FieldStar dj, dc) = (FieldStar (0.3 * dj + 2.0 * dc), dj)
+--     net = Knot (Lift (Pullback body)) :: Net Pullback (,) Double Double
+-- :}
+--
+-- >>> let solved = eliminateKnots (FieldStar 0) net
+-- >>> abs (evalPullback solved 1.0 - 2.0 / 0.7) < 1e-12
+-- True
 eliminateKnots ::
-  (StarChannel j, Additive (->) j) =>
-  Proxy j ->
+  forall j b a.
+  (StarChannel j) =>
+  j ->
   Net Pullback (,) b a ->
   Net Pullback (,) b a
-eliminateKnots proxy n =
-  Lift (Pullback (runStarPullback (runStarNet proxy (toStar (melt n)))))
-
--- | Re-interpret a 'Pullback' net as a 'StarPullback' net, preserving all
--- structure.
-toStar :: Net Pullback (,) b a -> Net StarPullback (,) b a
-toStar = \case
-  Lift p -> Lift (StarPullback (runPullback p))
-  Compose g f -> Compose (toStar g) (toStar f)
-  Par f g -> Par (toStar f) (toStar g)
-  Swap -> Swap
-  Knot f -> Knot (toStar f)
-  Copy -> unsupported "Copy"
-  Discard -> unsupported "Discard"
-  Add -> unsupported "Add"
-  Zero -> unsupported "Zero"
+eliminateKnots witness net = go (melt net)
   where
-    unsupported name =
-      error $
-        "Circuit.AD.Eliminate.toStar: structural "
-          ++ name
-          ++ " nodes are not supported; fuse them into Lifts first"
+    dim = channelDim witness
 
--- | Interpret a 'StarPullback' net, solving every 'Knot' in closed form.
---
--- The channel type @j@ is fixed at the top level; each 'Knot' is coerced to
--- use that channel.  This is safe for uniform-channel nets such as those
--- produced by 'linearizeNet'.
-runStarNet ::
-  (StarChannel j, Additive (->) j) =>
-  Proxy j ->
-  Net StarPullback (,) b a ->
-  StarPullback b a
-runStarNet proxy = \case
-  Lift p -> p
-  Compose g f -> runStarNet proxy g . runStarNet proxy f
-  Par f g -> parA (runStarNet proxy f) (runStarNet proxy g)
-  Swap -> swapA
-  Knot f -> solveKnot proxy (unsafeCoerce f)
-  Copy -> unsupported "Copy"
-  Discard -> unsupported "Discard"
-  Add -> unsupported "Add"
-  Zero -> unsupported "Zero"
-  where
-    unsupported name =
-      error $
-        "Circuit.AD.Eliminate.runStarNet: structural "
-          ++ name
-          ++ " nodes are not supported; fuse them into Lifts first"
+    go :: forall x y. Net Pullback (,) x y -> Net Pullback (,) x y
+    go n = case n of
+      Lift p -> Lift p
+      Compose g f -> Compose (go g) (go f)
+      Par f g -> Par (go f) (go g)
+      Swap -> Swap
+      Knot f ->
+        let f' = go f -- innermost first: body is knot-free below here
+            body =
+              runPullback
+                (runNet (unsafeCoerce f' :: Net Pullback (,) (j, x) (j, y)))
+         in Lift (Pullback (solveAffine dim body))
+      Copy -> unreachableRow "Copy"
+      Discard -> unreachableRow "Discard"
+      Add -> unreachableRow "Add"
+      Zero -> unreachableRow "Zero"
 
--- | Solve a single affine knot whose channel type matches the top-level
--- proxy.
-solveKnot ::
-  (StarChannel j, Additive (->) j) =>
-  Proxy j ->
-  Net StarPullback (,) (j, c) (j, b) ->
-  StarPullback c b
-solveKnot proxy body = traceStarPullback (runStarNet proxy body)
+    unreachableRow name =
+      error $
+        "Circuit.AD.Eliminate.eliminateKnots: structural "
+          ++ name
+          ++ " row after melt (impossible)"
