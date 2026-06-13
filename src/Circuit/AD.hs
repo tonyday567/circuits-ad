@@ -68,9 +68,8 @@ import Control.Category
 import Circuit.Classes
 #endif
 
-import Circuit.Additive (Additive (..))
 import Circuit.Circuit qualified as C
-import Circuit.Dup (Dup (..))
+import Circuit.Dagger (Additive (..), Dup (..))
 import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net (..))
 import Circuit.Net qualified
@@ -513,7 +512,7 @@ linearizeCircuit (C.Knot f) a =
 -- | Copy in D: the pullback is 'plus' (fan-in on the backward pass).
 --
 -- >>> import Circuit.Monoidal (MonoidalP(..))
--- >>> import Circuit.Dup (Dup(..))
+-- >>> import Circuit.Dagger (Dup(..))
 -- >>> let (_, pb) = runDiff (dup :: Diff Int (Int, Int)) 5
 -- >>> pb (1, 2)
 -- 3

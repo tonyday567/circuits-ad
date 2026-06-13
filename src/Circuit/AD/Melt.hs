@@ -17,9 +17,8 @@ module Circuit.AD.Melt
   )
 where
 
-import Circuit.Additive (Additive (..))
 import Circuit.AD.Pullback (Pullback (..))
-import Circuit.Dup (Dup (..))
+import Circuit.Dagger (Additive (..), Dup (..))
 import Circuit.Net (Net (..))
 import Prelude hiding (id, (.))
 

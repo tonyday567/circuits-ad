@@ -22,10 +22,9 @@ module Circuit.AD.Eliminate
   )
 where
 
-import Circuit.Additive (Additive (..))
 import Circuit.AD.Melt (melt)
 import Circuit.AD.Pullback (Pullback (..))
-import Circuit.Dup (Dup (..))
+import Circuit.Dagger (Additive (..), Dup (..))
 import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net (..))
 import Control.Category (Category (..))

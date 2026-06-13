@@ -34,7 +34,7 @@ module Circuit.AD.Star
 where
 
 import Circuit.AD (Diff, Diff' (..), pattern Diff, traceStarFrom)
-import Circuit.Additive (Additive (..))
+import Circuit.Dagger (Additive (..))
 import Hasknum.Matrix (FieldStar (..), Matrix (..), matVec, starMatrix)
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM

@@ -30,16 +30,14 @@ import Control.Category
 import Circuit.Classes
 #endif
 
-import Circuit.Additive (Additive (..))
-import Circuit.Dup (Dup (..))
+import Circuit.Dagger (Additive (..), Dup (..))
 import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net, runNet)
 import Circuit.Traced (Trace (..))
 import Prelude hiding (id, (.))
 
 -- $setup
--- >>> import Circuit.Additive (Additive (..))
--- >>> import Circuit.Dup (Dup (..))
+-- >>> import Circuit.Dagger (Additive (..), Dup (..))
 -- >>> import Circuit.Monoidal (MonoidalP (..))
 -- >>> import Circuit.Net (Net (..))
 -- >>> import Circuit.Traced (Trace (..))
