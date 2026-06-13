@@ -75,6 +75,7 @@ import Circuit.Net (Net (..))
 import Circuit.Net qualified
 import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Traced (Trace (..))
+import NumHask.Diff (Diff, Diff' (..), pattern Diff, runDiff)
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR
@@ -84,40 +85,6 @@ import Prelude hiding (id, (.))
 -- >>> import Circuit (Circuit (..), reify)
 -- >>> import Prelude hiding (id, (.))
 
--- | A reverse-mode differentiable function tagged by a phantom type @p@.
---
--- The phantom tag prevents perturbation confusion: values of type
--- @Diff' p a b@ can only be composed with other @Diff' p@ values.  Nested
--- AD introduces a fresh tag for each level.
---
--- @runDiff f a@ returns a pair @(b, pullback)@ where @b = f a@ and @pullback@
--- maps a cotangent @db@ on the output to a cotangent @da@ on the input.
-newtype Diff' (p :: k) a b = Diff'
-  { -- | Run the forward pass and return the backward pullback.
-    runDiff' :: a -> (b, b -> a)
-  }
-
--- | The untagged differentiable arrow.  Existing code can continue to use
--- this; it is simply @Diff' ()@.
-type Diff = Diff' ()
-
--- | Pattern synonym for the untagged constructor.  Use this or 'Diff'' to
--- build a 'Diff'' value.
-pattern Diff :: (a -> (b, b -> a)) -> Diff' p a b
-pattern Diff f = Diff' f
-
-{-# COMPLETE Diff :: Diff' #-}
-
--- | Run the forward pass and return the backward pullback.
-runDiff :: Diff' p a b -> a -> (b, b -> a)
-runDiff = runDiff'
-
-instance Category (Diff' p) where
-  id = Diff (\a -> (a, id))
-  Diff f . Diff g = Diff $ \a ->
-    let (b, gb) = g a
-        (c, fc) = f b
-     in (c, gb . fc)
 
 -- | 'Trace' for 'Diff' with the @(,)@ tensor.
 --
