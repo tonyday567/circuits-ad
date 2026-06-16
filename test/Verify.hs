@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms #-}
+
 {-# LANGUAGE RebindableSyntax #-}
 
 module Main (main) where

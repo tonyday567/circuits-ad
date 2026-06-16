@@ -33,7 +33,7 @@ sqrTag1 = Diff (\x -> (x * x, \d -> 2 * x * d))
 
 -- | Another map with the same tag composes cleanly.
 incTag1 :: Diff' Tag1 Double Double
-incTag1 = Diff (\x -> (x + 1, \d -> d))
+incTag1 = Diff (\x -> (x + 1, id))
 
 runTagTests :: IO ()
 runTagTests = do
@@ -45,7 +45,7 @@ runTagTests = do
 
   putStrLn "Untagged Diff behaves identically to tagged Diff"
   let sqrUntagged = Diff (\x -> (x * x, \d -> 2 * x * d)) :: Diff Double Double
-      incUntagged = Diff (\x -> (x + 1, \d -> d)) :: Diff Double Double
+      incUntagged = Diff (\x -> (x + 1, id)) :: Diff Double Double
       (yU, pbU) = runDiff (incUntagged . sqrUntagged) 3.0
   assert "untagged value" yU 10.0
   assert "untagged gradient" (pbU 1.0) 6.0

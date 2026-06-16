@@ -24,11 +24,11 @@ module Circuit.AD.Pullback
   )
 where
 
-#ifdef __GLASGOW_HASKELL__
+
 import Control.Category
-#else
-import Circuit.Classes
-#endif
+
+
+
 
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Monoidal (MonoidalP (..))
@@ -68,7 +68,7 @@ instance Category Pullback where
 -- >>> runPullback (par f g) (3, 4)
 -- (4,8)
 instance MonoidalP Pullback where
-  par (Pullback f) (Pullback g) = Pullback (\(b, d) -> (f b, g d))
+  par (Pullback f) (Pullback g) = Pullback (Data.Bifunctor.bimap f g)
   {-# INLINE par #-}
 
   swap = Pullback (\(b, a) -> (a, b))
@@ -100,7 +100,7 @@ instance Trace Pullback (,) where
      in db
   {-# INLINE trace #-}
 
-  untrace (Pullback g) = Pullback $ \(x, dc) -> (x, g dc)
+  untrace (Pullback g) = Pullback $ Data.Bifunctor.second g
   {-# INLINE untrace #-}
 
 -- | Pullback-instance of the comonoid structure.
@@ -125,7 +125,7 @@ instance Comonoid Pullback a where
   copy = Pullback (\b -> (b, b))
   {-# INLINE copy #-}
 
-  discard = Pullback (\_ -> ())
+  discard = Pullback (const ())
   {-# INLINE discard #-}
 
 -- | Pullback-instance of the additive/monoid structure.
@@ -149,5 +149,6 @@ instance (Monoid (->) a) => Monoid Pullback a where
 -- 'linearizeAt', and applying it to a cotangent @db@ yields the
 -- input cotangent @da@.
 evalPullback :: Net Pullback (,) b a -> b -> a
-evalPullback n db = runPullback (loom n) db
+evalPullback n = runPullback (loom n)
 {-# INLINE evalPullback #-}
+

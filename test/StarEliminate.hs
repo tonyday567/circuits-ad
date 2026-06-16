@@ -63,7 +63,7 @@ runStarEliminateTests = do
   let vecBody =
         Pullback $ \(dxs, FieldStar dc) ->
           let dxs' = map unFieldStar (take 2 (dxs ++ repeat NHA.zero))
-              dx1 = dxs' !! 0
+              dx1 = head dxs'
               dx2 = dxs' !! 1
            in ( [ FieldStar (0.5 * dx1 + 0.1 * dx2 + dc),
                   FieldStar (0.2 * dx1 + 0.3 * dx2 + 2.0 * dc)

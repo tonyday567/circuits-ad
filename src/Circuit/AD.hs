@@ -62,11 +62,11 @@ module Circuit.AD
   )
 where
 
-#ifdef __GLASGOW_HASKELL__
+
 import Control.Category
-#else
-import Circuit.Classes
-#endif
+
+
+
 
 import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Circuit qualified as C
@@ -123,7 +123,7 @@ instance Trace (Diff' p) (,) where
 
   untrace (Diff f) = Diff $ \(a, b) ->
     let (c, back) = f b
-     in ((a, c), \(da, dc) -> (da, back dc))
+     in ((a, c), Data.Bifunctor.second back)
 
 -- | Trace for 'Diff' with the 'Either' tensor.
 --
@@ -442,7 +442,7 @@ linearizeNet n a = case n of
     let (x, y) = a
      in (fst (runDiff (plus @(Diff' p) @b) (x, y)), Lift (Pullback (\dc -> (dc, dc))))
   Zero ->
-    (fst (runDiff (zero @(Diff' p) @b) ()), Lift (Pullback (\_ -> ())))
+    (fst (runDiff (zero @(Diff' p) @b) ()), Lift (Pullback (const ())))
   Knot f ->
     let ~((x, b), f') = linearizeNet f (x, a)
      in (b, Knot f')
@@ -487,7 +487,7 @@ instance (Monoid (->) a) => Comonoid (Diff' p) a where
   copy = Diff (\a -> ((a, a), CD.plus))
   {-# INLINE copy #-}
 
-  discard = Diff (\a -> ((), \() -> CD.zero ()))
+  discard = Diff (const ((), \ () -> CD.zero ()))
   {-# INLINE discard #-}
 
 -- | Add in D: the pullback is 'copy' (fan-out on the backward pass).
@@ -499,7 +499,7 @@ instance (Monoid (->) a) => Monoid (Diff' p) a where
   plus = Diff (\(a, b) -> (CD.plus (a, b), \d -> (d, d)))
   {-# INLINE plus #-}
 
-  zero = Diff (\() -> (CD.zero (), \_ -> ()))
+  zero = Diff (\() -> (CD.zero (), const ()))
   {-# INLINE zero #-}
 
 -- | Monoidal product for Diff: independent wires, no additive constraint.
@@ -514,7 +514,7 @@ instance (Monoid (->) a) => Monoid (Diff' p) a where
 instance MonoidalP (Diff' p) where
   par (Diff f) (Diff g) = Diff $ \(a, c) ->
     let (b, fb) = f a; (d, gd) = g c
-     in ((b, d), \(db, dd) -> (fb db, gd dd))
+     in ((b, d), Data.Bifunctor.bimap fb gd)
   {-# INLINE par #-}
 
   swap = Diff (\(a, b) -> ((b, a), \(db, da) -> (da, db)))
@@ -538,4 +538,5 @@ quadD :: Diff' p Double Double
 quadD = CD.plus . par sq lin . CD.copy
   where
     sq = Diff (\x -> (2 * x * x, \d -> 4 * x * d))
-    lin = Diff (\x -> (3 * x + 5, \d -> 3 * d))
+    lin = Diff (\x -> (3 * x + 5, (3 *)))
+
