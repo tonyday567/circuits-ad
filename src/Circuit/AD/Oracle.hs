@@ -34,9 +34,9 @@ module Circuit.AD.Oracle
   )
 where
 
-import Control.Category ((>>>))
 import Circuit (Circuit (..), reify)
-import Circuit.AD (Diff, Diff', pattern Diff, traceNFrom)
+import Circuit.AD (Diff, Diff', traceNFrom, pattern Diff)
+import Control.Category ((>>>))
 import Numeric.AD.DelCont (rad1)
 import Prelude hiding (id, (.))
 
@@ -54,11 +54,11 @@ import Prelude hiding (id, (.))
 -- ---------------------------------------------------------------------------
 
 -- | Pure function: @x -> x * x@.
-sqr :: Num a => a -> a
+sqr :: (Num a) => a -> a
 sqr x = x * x
 
 -- | Pure function: @x -> sin (x * x)@.
-sinSqr :: Floating a => a -> a
+sinSqr :: (Floating a) => a -> a
 sinSqr x = sin (x * x)
 
 -- ===========================================================================
@@ -126,12 +126,13 @@ sinSqrCircuit =
 sqrtBody :: Diff (Double, Double) (Double, Double)
 sqrtBody = Diff $ \(x, a) ->
   let x' = (x + a / x) / 2
-      jx = (1 - a / (x * x)) / 2   -- ∂x'/∂x: vanishes at x = √a
-      ja = 1 / (2 * x)             -- ∂x'/∂a
-   in ( (x', x')                    -- Copy: to channel AND output
-      , \(dx, dout) ->
-          let d = dx + dout         -- Add: fan-in on the contravariant side
-           in (d * jx, d * ja) )
+      jx = (1 - a / (x * x)) / 2 -- ∂x'/∂x: vanishes at x = √a
+      ja = 1 / (2 * x) -- ∂x'/∂a
+   in ( (x', x'), -- Copy: to channel AND output
+        \(dx, dout) ->
+          let d = dx + dout -- Add: fan-in on the contravariant side
+           in (d * jx, d * ja)
+      )
 
 -- | traceNFrom forward pass converges to @sqrt(a)@.
 --

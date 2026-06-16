@@ -27,18 +27,18 @@ module Circuit.AD.Eliminate
   )
 where
 
+import Circuit.AD.Matrix (Matrix (..), matVec, starMatrix)
 import Circuit.AD.Melt (melt)
 import Circuit.AD.Pullback (Pullback (..))
-import Circuit.Net (Net (..), loom)
-import Circuit.AD.Matrix (Matrix (..), matVec, starMatrix)
 import Circuit.Dagger qualified
-import NumHask.Free.Carriers (FieldStar (..))
+import Circuit.Net (Net (..), loom)
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR
+import NumHask.Free.Carriers (FieldStar (..))
+import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (id, (.))
 import Prelude qualified as P
-import Unsafe.Coerce (unsafeCoerce)
 
 -- $setup
 -- >>> import Circuit.AD.Pullback (Pullback (..), evalPullback)

@@ -33,14 +33,14 @@ module Circuit.AD.Star
   )
 where
 
-import Circuit.AD (Diff, Diff', pattern Diff, traceStarFrom)
-import Circuit.Dagger (Monoid)
-import qualified Circuit.Dagger as CD
+import Circuit.AD (Diff, Diff', traceStarFrom, pattern Diff)
 import Circuit.AD.Matrix (Matrix (..), matVec, starMatrix)
-import NumHask.Free.Carriers (FieldStar (..))
+import Circuit.Dagger (Monoid)
+import Circuit.Dagger qualified as CD
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR
+import NumHask.Free.Carriers (FieldStar (..))
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
@@ -112,7 +112,7 @@ traceStarMatrix x0 n (Diff body) = Diff $ \b ->
 -- >>> abs (pb 1.0 - 2.0 / 0.7) < 1e-12
 -- True
 traceStarFromD ::
-  Monoid (->) c =>
+  (Monoid (->) c) =>
   Double ->
   Int ->
   Diff' p (Double, b) (Double, c) ->
@@ -147,7 +147,7 @@ traceStarFromD x0 n (Diff body) =
 -- >>> abs (pb2 1.0 - 1.6 / 0.85) < 1e-12
 -- True
 traceStarMatrixD ::
-  Monoid (->) c =>
+  (Monoid (->) c) =>
   [Double] ->
   Int ->
   Diff' p ([Double], b) ([Double], c) ->

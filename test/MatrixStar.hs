@@ -32,8 +32,10 @@ runMatrixStarTests = do
         rows = map (map (\(FieldStar x) -> x)) (unMatrix (starMatrix m))
      in case rows of
           [[a, b], [c, d]] ->
-            abs (a - 1.2) < 1e-10 && abs (b - 0.2666666666666667) < 1e-10 &&
-            abs (c - 0.4) < 1e-10 && abs (d - 1.2) < 1e-10
+            abs (a - 1.2) < 1e-10
+              && abs (b - 0.2666666666666667) < 1e-10
+              && abs (c - 0.4) < 1e-10
+              && abs (d - 1.2) < 1e-10
           _ -> False
 
   assert "starMatrix empty matrix" $

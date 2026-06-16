@@ -4,11 +4,11 @@
 module Main (main) where
 
 import Circuit (Circuit, reify)
-import qualified Circuit
-import Circuit.Net (Net (..))
+import Circuit qualified
 import Circuit.AD
 import Circuit.AD.Pullback (evalPullback)
 import Circuit.Monoidal (MonoidalP (..))
+import Circuit.Net (Net (..))
 import Circuit.Traced (trace)
 import MatrixStar (runMatrixStarTests)
 import NumHask.Diff ()
@@ -40,7 +40,7 @@ quadNet = Compose Plus (Compose (Par (Lift sq) (Lift sq)) Copy)
 loopBody :: Diff (Double, Double) (Double, Double)
 loopBody = Diff $ \(x, b) ->
   let x' = 0.3 * x + 2 * b
-      c  = x + b
+      c = x + b
    in ((x', c), \(dx', dc) -> (0.3 * dx' + 2 * dc, dx' + dc))
 
 main :: IO ()

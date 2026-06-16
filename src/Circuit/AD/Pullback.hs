@@ -136,7 +136,7 @@ instance Comonoid Pullback a where
 -- 3
 -- >>> runPullback (zero :: Pullback () Int) ()
 -- 0
-instance Monoid (->) a => Monoid Pullback a where
+instance (Monoid (->) a) => Monoid Pullback a where
   plus = Pullback (\(b1, b2) -> plus (b1, b2))
   {-# INLINE plus #-}
 

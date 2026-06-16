@@ -6,14 +6,14 @@ module StarEliminate
   )
 where
 
-import Circuit.Net (Net (..))
 import Circuit.AD (Diff, Diff', backprop, pattern Diff)
 import Circuit.AD.Eliminate (eliminateKnots)
-import NumHask.Diff ()
 import Circuit.AD.Pullback (Pullback (..), evalPullback)
-import NumHask.Free.Carriers (FieldStar (..))
+import Circuit.Net (Net (..))
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
+import NumHask.Diff ()
+import NumHask.Free.Carriers (FieldStar (..))
 import Prelude hiding (id, (.))
 
 near :: Double -> Double -> Bool
@@ -70,7 +70,7 @@ runStarEliminateTests = do
                 ],
                 FieldStar (dx1 + dx2 + dc)
               ) ::
-              ([FieldStar], FieldStar)
+                ([FieldStar], FieldStar)
       vecKnot = Knot (Lift vecBody) :: Net Pullback (,) FieldStar FieldStar
       eliminatedVec = eliminateKnots [FieldStar 0, FieldStar 0] vecKnot
       FieldStar gVec = evalPullback eliminatedVec (FieldStar 1.0)

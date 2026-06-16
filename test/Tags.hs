@@ -7,7 +7,7 @@ module Tags
   )
 where
 
-import Circuit.AD (Diff, Diff', pattern Diff, runDiff)
+import Circuit.AD (Diff, Diff', runDiff, pattern Diff)
 import NumHask.Diff ()
 import NumHask.Prelude
 import Prelude ()

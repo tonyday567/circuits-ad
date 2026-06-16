@@ -68,24 +68,23 @@ import Control.Category
 import Circuit.Classes
 #endif
 
+import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Circuit qualified as C
 import Circuit.Dagger (Comonoid (..), Monoid (..))
-import qualified Circuit.Dagger as CD
+import Circuit.Dagger qualified as CD
 import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net (..))
 import Circuit.Net qualified
-import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Traced (Trace (..))
-import NumHask.Diff (Diff, Diff', pattern Diff, runDiff)
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR
+import NumHask.Diff (Diff, Diff', runDiff, pattern Diff)
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
 -- >>> import Circuit (Circuit (..), reify)
 -- >>> import Prelude hiding (id, (.))
-
 
 -- | 'Trace' for 'Diff' with the @(,)@ tensor.
 --
@@ -225,7 +224,7 @@ instance Trace (Diff' p) Either where
 --
 -- Lives beside the lawful-but-lazy instance, not replacing it.
 traceNFrom ::
-  Monoid (->) a =>
+  (Monoid (->) a) =>
   a ->
   Int ->
   Diff' p (a, b) (a, c) ->
@@ -484,7 +483,7 @@ linearizeCircuit (C.Knot f) a =
 -- >>> let (_, pb) = runDiff (dup :: Diff Int (Int, Int)) 5
 -- >>> pb (1, 2)
 -- 3
-instance Monoid (->) a => Comonoid (Diff' p) a where
+instance (Monoid (->) a) => Comonoid (Diff' p) a where
   copy = Diff (\a -> ((a, a), CD.plus))
   {-# INLINE copy #-}
 
@@ -496,7 +495,7 @@ instance Monoid (->) a => Comonoid (Diff' p) a where
 -- >>> let (_, pb) = runDiff (plus :: Diff (Int, Int) Int) (3, 4)
 -- >>> pb 1
 -- (1,1)
-instance Monoid (->) a => Monoid (Diff' p) a where
+instance (Monoid (->) a) => Monoid (Diff' p) a where
   plus = Diff (\(a, b) -> (CD.plus (a, b), \d -> (d, d)))
   {-# INLINE plus #-}
 
@@ -538,6 +537,5 @@ instance MonoidalP (Diff' p) where
 quadD :: Diff' p Double Double
 quadD = CD.plus . par sq lin . CD.copy
   where
-    sq  = Diff (\x -> (2*x*x,   \d -> 4*x*d))
-    lin = Diff (\x -> (3*x + 5, \d -> 3*d))
-
+    sq = Diff (\x -> (2 * x * x, \d -> 4 * x * d))
+    lin = Diff (\x -> (3 * x + 5, \d -> 3 * d))

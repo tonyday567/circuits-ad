@@ -25,7 +25,7 @@ newtype Matrix a = Matrix {unMatrix :: [[a]]}
   deriving (Eq, Show)
 
 -- | Elementwise addition.
-matPlus :: NHA.Additive a => Matrix a -> Matrix a -> Matrix a
+matPlus :: (NHA.Additive a) => Matrix a -> Matrix a -> Matrix a
 matPlus (Matrix a) (Matrix b) =
   Matrix [zipWith (NHA.+) rowA rowB | (rowA, rowB) <- zip a b]
 
@@ -71,7 +71,7 @@ combine (Matrix a) (Matrix b) (Matrix c) (Matrix d) =
     )
 
 -- | Kleene star of a square matrix by 2×2 block recursion.
-starMatrix :: NHR.StarSemiring a => Matrix a -> Matrix a
+starMatrix :: (NHR.StarSemiring a) => Matrix a -> Matrix a
 starMatrix (Matrix []) = Matrix []
 starMatrix m =
   case unMatrix m of
