@@ -1,4 +1,5 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RebindableSyntax #-}
 
 -- | Tests for phantom-tag separation on 'Diff''.
 module Tags
@@ -6,10 +7,10 @@ module Tags
   )
 where
 
-import Circuit.AD (Diff, Diff' (..), pattern Diff, runDiff)
+import Circuit.AD (Diff, Diff', pattern Diff, runDiff)
 import NumHask.Diff ()
-import Control.Category ((.))
-import Prelude hiding (id, (.))
+import NumHask.Prelude
+import Prelude ()
 
 near :: Double -> Double -> Bool
 near x y = abs (x - y) < 1e-9

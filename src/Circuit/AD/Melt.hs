@@ -1,6 +1,6 @@
 -- | Pure structural melting for 'Net Pullback'.
 --
--- 'Circuit.Net.forget' melts bimonoid rows ('Copy', 'Discard', 'Add',
+-- 'Circuit.Net.melt' melts bimonoid rows ('Copy', 'Discard', 'Plus',
 -- 'Zero') by /running/ the net.  That is fine for knot-free wiring, but it
 -- eagerly ties any lazy 'Knot' encountered along the way — so a net with
 -- non-zero channel self-coupling diverges before a subsequent star-elimination
@@ -18,14 +18,14 @@ module Circuit.AD.Melt
 where
 
 import Circuit.AD.Pullback (Pullback (..))
-import Circuit.Dagger (Additive (..), Dup (..))
+import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Net (Net (..))
-import Prelude hiding (id, (.))
+import Prelude hiding (Monoid, id, (.))
 
 -- | Replace every structural row with its pure 'Pullback' interpretation.
 --
--- The 'Linear' constraints carried by 'Copy', 'Discard', 'Add' and 'Zero'
--- guarantee that the corresponding 'Dup' / 'Additive' methods exist for
+-- The 'Bimonoid' constraints carried by 'Copy', 'Discard', 'Plus' and 'Zero'
+-- guarantee that the corresponding 'Comonoid' / 'Monoid' methods exist for
 -- 'Pullback', so melting needs no forward execution.
 melt :: Net Pullback (,) a b -> Net Pullback (,) a b
 melt = \case
@@ -34,7 +34,7 @@ melt = \case
   Par f g -> Par (melt f) (melt g)
   Swap -> Swap
   Knot f -> Knot (melt f)
-  Copy -> Lift dup
+  Copy -> Lift copy
   Discard -> Lift discard
-  Add -> Lift plus
+  Plus -> Lift plus
   Zero -> Lift zero

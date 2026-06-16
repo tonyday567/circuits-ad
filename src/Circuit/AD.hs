@@ -24,7 +24,7 @@
 --
 -- >>> import Circuit (Circuit(..), reify)
 -- >>> import Circuit.AD
--- >>> import Prelude hiding (id, (.))
+-- >>> import Prelude hiding (Monoid, id, (.))
 -- >>> let f = Lift (Diff (\x -> (x * x, \dx' -> 2 * x * dx'))) :: Circuit Diff (,) Double Double
 -- >>> let (y, pullback) = runDiff (reify f) 3.0
 -- >>> y
@@ -36,7 +36,7 @@ module Circuit.AD
     Diff,
 
     -- * Tagged differentiable arrow
-    Diff' (..),
+    Diff',
 
     -- * Constructor pattern
     pattern Diff,
@@ -69,17 +69,18 @@ import Circuit.Classes
 #endif
 
 import Circuit.Circuit qualified as C
-import Circuit.Dagger (Additive (..), Dup (..))
+import Circuit.Dagger (Comonoid (..), Monoid (..))
+import qualified Circuit.Dagger as CD
 import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net (..))
 import Circuit.Net qualified
 import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Traced (Trace (..))
-import NumHask.Diff (Diff, Diff' (..), pattern Diff, runDiff)
+import NumHask.Diff (Diff, Diff', pattern Diff, runDiff)
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR
-import Prelude hiding (id, (.))
+import Prelude hiding (Monoid, id, (.))
 
 -- $setup
 -- >>> import Circuit (Circuit (..), reify)
@@ -224,7 +225,7 @@ instance Trace (Diff' p) Either where
 --
 -- Lives beside the lawful-but-lazy instance, not replacing it.
 traceNFrom ::
-  Additive (->) a =>
+  Monoid (->) a =>
   a ->
   Int ->
   Diff' p (a, b) (a, c) ->
@@ -237,7 +238,7 @@ traceNFrom x0 n (Diff body) = Diff $ \b ->
       -- Backward: iterate from zero, extract result once
       pullback dc =
         let stepBwd d = fst (backward (d, dc))
-            da = iterate stepBwd (zero ()) !! n
+            da = iterate stepBwd (CD.zero ()) !! n
          in snd (backward (da, dc))
    in (c, pullback)
 
@@ -297,7 +298,7 @@ traceNFrom x0 n (Diff body) = Diff $ \b ->
 -- affine-with-offset is a bug that this function will silently
 -- misread.
 traceStarFrom ::
-  (NHR.StarSemiring j, Additive (->) c) =>
+  (NHR.StarSemiring j, Monoid (->) c) =>
   -- | forward seed
   j ->
   -- | forward iteration count
@@ -310,7 +311,7 @@ traceStarFrom x0 n (Diff body) = Diff $ \b ->
       a = iterate stepFwd x0 !! n
       ((_, c), backward) = body (a, b)
       -- Probe the channel self-coupling once; star it in closed form
-      aStar = NHR.star (fst (backward (NHM.one, zero ())))
+      aStar = NHR.star (fst (backward (NHM.one, CD.zero ())))
       -- Backward: exact in two more probes — no iteration
       pullback dc =
         let cdc = fst (backward (NHA.zero, dc))
@@ -396,7 +397,7 @@ fromDiffAt (Diff f) a = Pullback (snd (f a))
 
 -- | Run a 'Net Diff' forward and build the transposed pullback net.
 --
--- This linearizes the 'Net' directly, without 'Circuit.Net.forget', so
+-- This linearizes the 'Net' directly, without 'Circuit.Net.melt', so
 -- 'Knot's inside 'Par' arms survive as 'Knot's in the pullback net.
 linearizeAt ::
   forall p a b.
@@ -438,7 +439,7 @@ linearizeNet n a = case n of
     ((a, a), Lift (Pullback (\(db1, db2) -> fst (runDiff (plus @(Diff' p) @a) (db1, db2)))))
   Discard ->
     ((), Lift (Pullback (\_ -> fst (runDiff (zero @(Diff' p) @a) ()))))
-  Add ->
+  Plus ->
     let (x, y) = a
      in (fst (runDiff (plus @(Diff' p) @b) (x, y)), Lift (Pullback (\dc -> (dc, dc))))
   Zero ->
@@ -448,8 +449,8 @@ linearizeNet n a = case n of
      in (b, Knot f')
 
 -- | Pointwise linearization over the core 'Circuit' language.  The
--- bimonoid rows ('Copy', 'Add', ...) have already been melted into
--- 'Lift's by 'Circuit.Net.forget', so this recursion only sees 'Lift',
+-- bimonoid rows ('Copy', 'Plus', ...) have already been melted into
+-- 'Lift's by 'Circuit.Net.melt', so this recursion only sees 'Lift',
 -- 'Compose', and 'Knot'.
 linearizeCircuit ::
   forall p a b.
@@ -468,7 +469,7 @@ linearizeCircuit (C.Knot f) a =
    in (b, Knot f')
 
 -- ---------------------------------------------------------------------------
--- Dup Diff — copy and discard for the differentiable arrow.
+-- Comonoid Diff — copy and discard for the differentiable arrow.
 --
 -- In Diff, the bimonoid is self-dual under differentiation: copy's pullback
 -- is plus, discard's pullback is zero, plus's pullback is dup, zero's
@@ -479,52 +480,52 @@ linearizeCircuit (C.Knot f) a =
 -- | Copy in D: the pullback is 'plus' (fan-in on the backward pass).
 --
 -- >>> import Circuit.Monoidal (MonoidalP(..))
--- >>> import Circuit.Dagger (Dup(..))
+-- >>> import Circuit.Dagger (Comonoid(..))
 -- >>> let (_, pb) = runDiff (dup :: Diff Int (Int, Int)) 5
 -- >>> pb (1, 2)
 -- 3
-instance Additive (->) a => Dup (Diff' p) a where
-  dup = Diff (\a -> ((a, a), plus))
-  {-# INLINE dup #-}
+instance Monoid (->) a => Comonoid (Diff' p) a where
+  copy = Diff (\a -> ((a, a), CD.plus))
+  {-# INLINE copy #-}
 
-  discard = Diff (\a -> ((), \() -> zero ()))
+  discard = Diff (\a -> ((), \() -> CD.zero ()))
   {-# INLINE discard #-}
 
--- | Add in D: the pullback is 'dup' (fan-out on the backward pass).
+-- | Add in D: the pullback is 'copy' (fan-out on the backward pass).
 --
 -- >>> let (_, pb) = runDiff (plus :: Diff (Int, Int) Int) (3, 4)
 -- >>> pb 1
 -- (1,1)
-instance Additive (->) a => Additive (Diff' p) a where
-  plus = Diff (\(a, b) -> (plus (a, b), \d -> (d, d)))
+instance Monoid (->) a => Monoid (Diff' p) a where
+  plus = Diff (\(a, b) -> (CD.plus (a, b), \d -> (d, d)))
   {-# INLINE plus #-}
 
-  zero = Diff (\() -> (zero (), \_ -> ()))
+  zero = Diff (\() -> (CD.zero (), \_ -> ()))
   {-# INLINE zero #-}
 
 -- | Monoidal product for Diff: independent wires, no additive constraint.
 --
 -- >>> let f = Diff (\x -> (x + 1, \d -> d)) :: Diff Int Int
 -- >>> let g = Diff (\x -> (x * 2, \d -> 2 * d)) :: Diff Int Int
--- >>> let (y, pb) = runDiff (parA f g) (3, 4)
+-- >>> let (y, pb) = runDiff (par f g) (3, 4)
 -- >>> y
 -- (4,8)
 -- >>> pb (1, 1)
 -- (1,2)
 instance MonoidalP (Diff' p) where
-  parA (Diff f) (Diff g) = Diff $ \(a, c) ->
+  par (Diff f) (Diff g) = Diff $ \(a, c) ->
     let (b, fb) = f a; (d, gd) = g c
      in ((b, d), \(db, dd) -> (fb db, gd dd))
-  {-# INLINE parA #-}
+  {-# INLINE par #-}
 
-  swapA = Diff (\(a, b) -> ((b, a), \(db, da) -> (da, db)))
-  {-# INLINE swapA #-}
+  swap = Diff (\(a, b) -> ((b, a), \(db, da) -> (da, db)))
+  {-# INLINE swap #-}
 
 -- ---------------------------------------------------------------------------
 -- Smoke test: quadratic — the term that was impossible in Stage 1
 -- ---------------------------------------------------------------------------
 
--- | @2x² + 3x + 5@ built from 'parA', 'dup', and 'plus' on the @Diff@ arrow.
+-- | @2x² + 3x + 5@ built from 'par', 'dup', and 'plus' on the @Diff@ arrow.
 -- No 'Net' needed — the instances are the denotations the rows will reify to.
 --
 -- The gradient is @4x + 3@, so at @x = 1@: value 10, gradient 7.
@@ -535,7 +536,7 @@ instance MonoidalP (Diff' p) where
 -- >>> pb 1.0
 -- 7.0
 quadD :: Diff' p Double Double
-quadD = plus . parA sq lin . dup
+quadD = CD.plus . par sq lin . CD.copy
   where
     sq  = Diff (\x -> (2*x*x,   \d -> 4*x*d))
     lin = Diff (\x -> (3*x + 5, \d -> 3*d))

@@ -1,24 +1,22 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE RebindableSyntax #-}
 
 module Main (main) where
 
-import Prelude hiding (id, (.))
-import Control.Category (id)
-import System.Exit (exitFailure)
 import Circuit (Circuit, reify)
 import qualified Circuit
 import Circuit.Net (Net (..))
 import Circuit.AD
-import NumHask.Diff ()
-import Circuit.Traced (trace)
 import Circuit.AD.Pullback (evalPullback)
-import Circuit.Dagger (Additive (..), Dup (..))
 import Circuit.Monoidal (MonoidalP (..))
+import Circuit.Traced (trace)
 import MatrixStar (runMatrixStarTests)
+import NumHask.Diff ()
+import NumHask.Prelude
 import StarEliminate (runStarEliminateTests)
+import System.Exit (exitFailure)
 import Tags (runTagTests)
-import qualified NumHask.Algebra.Field as NHF
-import qualified NumHask.Algebra.Multiplicative as NHM
+import Prelude ()
 
 near :: Double -> Double -> Bool
 near x y = abs (x - y) < 1e-9
@@ -36,7 +34,7 @@ sq = Diff (\x -> (x * x, \d -> 2 * x * d))
 
 -- | Net computing 2*x^2 via copy, parallel squares, then add.
 quadNet :: Net Diff (,) Double Double
-quadNet = Compose Add (Compose (Par (Lift sq) (Lift sq)) Copy)
+quadNet = Compose Plus (Compose (Par (Lift sq) (Lift sq)) Copy)
 
 -- | Linear feedback loop: x' = 0.3*x + 2*b, c = x + b.
 loopBody :: Diff (Double, Double) (Double, Double)
@@ -67,24 +65,24 @@ main = do
   assert "value" y1 9.0
   assert "gradient" (pb1 1.0) 6.0
 
-  putStrLn "Num instance polynomial (2x^2 + 3x + 5)"
+  putStrLn "NumHask polynomial (2x^2 + 3x + 5)"
   let poly = 2 * id * id + 3 * id + 5 :: Diff Double Double
       (y2, pb2) = runDiff poly 1.0
   assert "value" y2 10.0
   assert "gradient" (pb2 1.0) 7.0
 
   putStrLn "NumHask ExpField instance (exp)"
-  let (y3, pb3) = runDiff (NHF.exp id :: Diff Double Double) 0.0
+  let (y3, pb3) = runDiff (exp id :: Diff Double Double) 0.0
   assert "value" y3 1.0
   assert "gradient" (pb3 1.0) 1.0
 
   putStrLn "NumHask TrigField instance (sin)"
-  let (y4, pb4) = runDiff (NHF.sin id :: Diff Double Double) 0.0
+  let (y4, pb4) = runDiff (sin id :: Diff Double Double) 0.0
   assert "value" y4 0.0
   assert "gradient" (pb4 1.0) 1.0
 
   putStrLn "NumHask Divisive instance (recip)"
-  let (y5, pb5) = runDiff (NHM.recip id :: Diff Double Double) 2.0
+  let (y5, pb5) = runDiff (recip id :: Diff Double Double) 2.0
   assert "value" y5 0.5
   assert "gradient" (pb5 1.0) (-0.25)
 
@@ -122,5 +120,3 @@ main = do
   runMatrixStarTests
   runStarEliminateTests
   runTagTests
-
-  putStrLn "All verifications passed."

@@ -7,7 +7,7 @@ module StarEliminate
 where
 
 import Circuit.Net (Net (..))
-import Circuit.AD (Diff, Diff' (..), backprop, pattern Diff)
+import Circuit.AD (Diff, Diff', backprop, pattern Diff)
 import Circuit.AD.Eliminate (eliminateKnots)
 import NumHask.Diff ()
 import Circuit.AD.Pullback (Pullback (..), evalPullback)
@@ -79,7 +79,7 @@ runStarEliminateTests = do
 
   putStrLn "Melt structural rows around a knot"
   let copiedKnot =
-        Compose Add (Compose (Par scalarKnot scalarKnot) Copy) ::
+        Compose Plus (Compose (Par scalarKnot scalarKnot) Copy) ::
           Net Pullback (,) FieldStar FieldStar
       eliminatedCopy = eliminateKnots (FieldStar 0) copiedKnot
       FieldStar gCopy = evalPullback eliminatedCopy (FieldStar 1.0)

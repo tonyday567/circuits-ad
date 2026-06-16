@@ -29,7 +29,7 @@ where
 
 import Circuit.AD.Melt (melt)
 import Circuit.AD.Pullback (Pullback (..))
-import Circuit.Net (Net (..), runNet)
+import Circuit.Net (Net (..), loom)
 import Circuit.AD.Matrix (Matrix (..), matVec, starMatrix)
 import Circuit.Dagger qualified
 import NumHask.Free.Carriers (FieldStar (..))
@@ -132,7 +132,7 @@ instance
 -- 'Circuit.AD.linearizeNet' never need this — their structural rows are
 -- already 'Lift's.)  Deliberately orphan: this module is the federation
 -- seam between @circuits@ and @numhask-free@.
-instance Circuit.Dagger.Additive (->) FieldStar where
+instance Circuit.Dagger.Monoid (->) FieldStar where
   plus (FieldStar x, FieldStar y) = FieldStar (x P.+ y)
   zero _ = FieldStar 0
 
@@ -169,7 +169,7 @@ solveAffine dim body dc =
 -- Structural rows are melted first ('Circuit.AD.Melt.melt'); then the
 -- recursion replaces each 'Knot' — innermost first, so a knot body handed
 -- to 'solveAffine' is already loop-free and can be evaluated by plain
--- 'runNet' — with one solved 'Lift'.  Everything else keeps its shape.
+-- 'loom' — with one solved 'Lift'.  Everything else keeps its shape.
 --
 -- __The channel witness__: pass a sample channel cotangent (its value is
 -- irrelevant; its /dimension/ is read with 'channelDim').  The channel type
@@ -216,11 +216,11 @@ eliminateKnots witness net = go (melt net)
         let f' = go f -- innermost first: body is knot-free below here
             body =
               runPullback
-                (runNet (unsafeCoerce f' :: Net Pullback (,) (j, x) (j, y)))
+                (loom (unsafeCoerce f' :: Net Pullback (,) (j, x) (j, y)))
          in Lift (Pullback (solveAffine dim body))
       Copy -> unreachableRow "Copy"
       Discard -> unreachableRow "Discard"
-      Add -> unreachableRow "Add"
+      Plus -> unreachableRow "Plus"
       Zero -> unreachableRow "Zero"
 
     unreachableRow name =

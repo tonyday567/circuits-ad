@@ -30,14 +30,14 @@ import Control.Category
 import Circuit.Classes
 #endif
 
-import Circuit.Dagger (Additive (..), Dup (..))
+import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Monoidal (MonoidalP (..))
-import Circuit.Net (Net, runNet)
+import Circuit.Net (Net, loom)
 import Circuit.Traced (Trace (..))
-import Prelude hiding (id, (.))
+import Prelude hiding (Monoid, id, (.))
 
 -- $setup
--- >>> import Circuit.Dagger (Additive (..), Dup (..))
+-- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
 -- >>> import Circuit.Monoidal (MonoidalP (..))
 -- >>> import Circuit.Net (Net (..))
 -- >>> import Circuit.Traced (Trace (..))
@@ -60,19 +60,19 @@ instance Category Pullback where
   {-# INLINE id #-}
   {-# INLINE (.) #-}
 
--- | Parallel composition pairs pullbacks independently; 'swapA' swaps
+-- | Parallel composition pairs pullbacks independently; 'swap' swaps
 -- the two cotangents.
 --
 -- >>> let f = Pullback (+1) :: Pullback Int Int
 -- >>> let g = Pullback (*2) :: Pullback Int Int
--- >>> runPullback (parA f g) (3, 4)
+-- >>> runPullback (par f g) (3, 4)
 -- (4,8)
 instance MonoidalP Pullback where
-  parA (Pullback f) (Pullback g) = Pullback (\(b, d) -> (f b, g d))
-  {-# INLINE parA #-}
+  par (Pullback f) (Pullback g) = Pullback (\(b, d) -> (f b, g d))
+  {-# INLINE par #-}
 
-  swapA = Pullback (\(b, a) -> (a, b))
-  {-# INLINE swapA #-}
+  swap = Pullback (\(b, a) -> (a, b))
+  {-# INLINE swap #-}
 
 -- | The cartesian trace for pullbacks.
 --
@@ -103,14 +103,14 @@ instance Trace Pullback (,) where
   untrace (Pullback g) = Pullback $ \(x, dc) -> (x, g dc)
   {-# INLINE untrace #-}
 
--- | Pullback-instance of the copy/comonoid structure.
+-- | Pullback-instance of the comonoid structure.
 --
 -- Copy's pullback is addition; discard's pullback is the zero
 -- cotangent.  These are not used by 'linearizeAt' (which encodes
 -- structural rows as 'Lift's to avoid channel-type constraints), but
 -- they make 'Pullback' a full bimonoid carrier.
 --
--- >>> runPullback (dup :: Pullback Int (Int, Int)) 3
+-- >>> runPullback (copy :: Pullback Int (Int, Int)) 3
 -- (3,3)
 -- >>> runPullback (discard :: Pullback Int ()) 5
 -- ()
@@ -121,9 +121,9 @@ instance Trace Pullback (,) where
 -- permits, drop the constraint; keeping a stray @Additive@ here reads
 -- as \"addition happens in this instance\", which is exactly the
 -- confusion the paragraph above tries to dispel.
-instance Additive (->) a => Dup Pullback a where
-  dup = Pullback (\b -> (b, b))
-  {-# INLINE dup #-}
+instance Comonoid Pullback a where
+  copy = Pullback (\b -> (b, b))
+  {-# INLINE copy #-}
 
   discard = Pullback (\_ -> ())
   {-# INLINE discard #-}
@@ -136,7 +136,7 @@ instance Additive (->) a => Dup Pullback a where
 -- 3
 -- >>> runPullback (zero :: Pullback () Int) ()
 -- 0
-instance Additive (->) a => Additive Pullback a where
+instance Monoid (->) a => Monoid Pullback a where
   plus = Pullback (\(b1, b2) -> plus (b1, b2))
   {-# INLINE plus #-}
 
@@ -149,5 +149,5 @@ instance Additive (->) a => Additive Pullback a where
 -- 'linearizeAt', and applying it to a cotangent @db@ yields the
 -- input cotangent @da@.
 evalPullback :: Net Pullback (,) b a -> b -> a
-evalPullback n db = runPullback (runNet n) db
+evalPullback n db = runPullback (loom n) db
 {-# INLINE evalPullback #-}

@@ -14,7 +14,7 @@
 -- = Pointwise transposition = lens pullback
 --
 -- Transposing a 'Net Diff' at a point does not need new syntax — the lens
--- already computes the transpose.  @snd (runDiff (runNet n) a)@ is the
+-- already computes the transpose.  @snd (runDiff (loom n) a)@ is the
 -- pullback (cotangent→cotangent map) at @a@, and the forward pass of
 -- any hypothetical @transposeAt n a@ would be exactly that function.
 -- The structural rows (Copy↔Add, etc.) are self-dual at the instance
@@ -36,7 +36,7 @@ where
 
 import Control.Category ((>>>))
 import Circuit (Circuit (..), reify)
-import Circuit.AD (Diff, Diff' (..), pattern Diff, traceNFrom)
+import Circuit.AD (Diff, Diff', pattern Diff, traceNFrom)
 import Numeric.AD.DelCont (rad1)
 import Prelude hiding (id, (.))
 

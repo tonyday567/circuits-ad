@@ -33,14 +33,15 @@ module Circuit.AD.Star
   )
 where
 
-import Circuit.AD (Diff, Diff' (..), pattern Diff, traceStarFrom)
-import Circuit.Dagger (Additive (..))
+import Circuit.AD (Diff, Diff', pattern Diff, traceStarFrom)
+import Circuit.Dagger (Monoid)
+import qualified Circuit.Dagger as CD
 import Circuit.AD.Matrix (Matrix (..), matVec, starMatrix)
 import NumHask.Free.Carriers (FieldStar (..))
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR
-import Prelude hiding (id, (.))
+import Prelude hiding (Monoid, id, (.))
 
 -- $setup
 -- >>> import Circuit.AD (Diff (..))
@@ -65,7 +66,7 @@ import Prelude hiding (id, (.))
 -- __Proof obligation__: probing assumes every primitive's pullback is
 -- a genuinely linear map — true for honestly-constructed 'Diff' prims.
 traceStarMatrix ::
-  (NHR.StarSemiring j, Additive (->) c) =>
+  (NHR.StarSemiring j, Monoid (->) c) =>
   -- | forward seed; its length is the channel dimension
   [j] ->
   -- | forward iteration count
@@ -81,7 +82,7 @@ traceStarMatrix x0 n (Diff body) = Diff $ \b ->
       -- Channel self-coupling, column i = backward probe at e_i
       zeroV = replicate dim NHA.zero
       basis i = [if k == i then NHM.one else NHA.zero | k <- [0 .. dim - 1]]
-      cols = [fst (backward (basis i, zero ())) | i <- [0 .. dim - 1]]
+      cols = [fst (backward (basis i, CD.zero ())) | i <- [0 .. dim - 1]]
       aMat = Matrix [[col !! k | col <- cols] | k <- [0 .. dim - 1]]
       -- star A — Gaussian elimination / Warshall / Floyd–Warshall /
       -- state elimination, depending on the carrier
@@ -111,7 +112,7 @@ traceStarMatrix x0 n (Diff body) = Diff $ \b ->
 -- >>> abs (pb 1.0 - 2.0 / 0.7) < 1e-12
 -- True
 traceStarFromD ::
-  Additive (->) c =>
+  Monoid (->) c =>
   Double ->
   Int ->
   Diff' p (Double, b) (Double, c) ->
@@ -146,7 +147,7 @@ traceStarFromD x0 n (Diff body) =
 -- >>> abs (pb2 1.0 - 1.6 / 0.85) < 1e-12
 -- True
 traceStarMatrixD ::
-  Additive (->) c =>
+  Monoid (->) c =>
   [Double] ->
   Int ->
   Diff' p ([Double], b) ([Double], c) ->
