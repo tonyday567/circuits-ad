@@ -24,16 +24,11 @@ module Circuit.AD.Pullback
   )
 where
 
-
-import Control.Category
-
-
-
-
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net, loom)
 import Circuit.Traced (Trace (..))
+import Control.Category
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
@@ -151,4 +146,3 @@ instance (Monoid (->) a) => Monoid Pullback a where
 evalPullback :: Net Pullback (,) b a -> b -> a
 evalPullback n = runPullback (loom n)
 {-# INLINE evalPullback #-}
-

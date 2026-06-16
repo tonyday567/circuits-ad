@@ -1,4 +1,3 @@
-
 {-# LANGUAGE RebindableSyntax #-}
 
 module Main (main) where

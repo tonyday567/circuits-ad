@@ -62,12 +62,6 @@ module Circuit.AD
   )
 where
 
-
-import Control.Category
-
-
-
-
 import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Circuit qualified as C
 import Circuit.Dagger (Comonoid (..), Monoid (..))
@@ -76,6 +70,7 @@ import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net (..))
 import Circuit.Net qualified
 import Circuit.Traced (Trace (..))
+import Control.Category
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR
@@ -487,7 +482,7 @@ instance (Monoid (->) a) => Comonoid (Diff' p) a where
   copy = Diff (\a -> ((a, a), CD.plus))
   {-# INLINE copy #-}
 
-  discard = Diff (const ((), \ () -> CD.zero ()))
+  discard = Diff (const ((), \() -> CD.zero ()))
   {-# INLINE discard #-}
 
 -- | Add in D: the pullback is 'copy' (fan-out on the backward pass).
@@ -539,4 +534,3 @@ quadD = CD.plus . par sq lin . CD.copy
   where
     sq = Diff (\x -> (2 * x * x, \d -> 4 * x * d))
     lin = Diff (\x -> (3 * x + 5, (3 *)))
-
