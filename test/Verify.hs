@@ -2,7 +2,7 @@
 
 module Main (main) where
 
-import Circuit (Trace, reify)
+import Circuit (Trace, realise)
 import Circuit qualified
 import Circuit.AD
 import Circuit.AD.Pullback (evalPullback)
@@ -57,8 +57,8 @@ main = do
   assert "value" yLoop (1.0 / (1.0 - 0.3) * 2.0 + 1.0)
   assert "gradient" (pbLoop 1.0) (1.0 / (1.0 - 0.3) * 2.0 + 1.0)
 
-  putStrLn "direct primitive via reify"
-  let (yPrim, pbPrim) = runDiff (reify (Circuit.Lift sq :: Trace (,) Diff Double Double)) 3.0
+  putStrLn "direct primitive via realise"
+  let (yPrim, pbPrim) = runDiff (realise (Circuit.Lift sq :: Trace (,) Diff Double Double)) 3.0
   assert "value" yPrim 9.0
   assert "gradient" (pbPrim 1.0) 6.0
 

@@ -31,7 +31,7 @@ import Circuit.AD.Matrix (Matrix (..), matVec, starMatrix)
 import Circuit.AD.Melt (melt)
 import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Dagger qualified
-import Circuit.Net (Net (..), loom)
+import Circuit.Net (Net (..), weave)
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR
@@ -169,7 +169,7 @@ solveAffine dim body dc =
 -- Structural rows are melted first ('Circuit.AD.Melt.melt'); then the
 -- recursion replaces each 'Trace' — innermost first, so a knot body handed
 -- to 'solveAffine' is already loop-free and can be evaluated by plain
--- 'loom' — with one solved 'Lift'.  Everything else keeps its shape.
+-- 'weave' — with one solved 'Lift'.  Everything else keeps its shape.
 --
 -- __The channel witness__: pass a sample channel cotangent (its value is
 -- irrelevant; its /dimension/ is read with 'channelDim').  The channel type
@@ -216,7 +216,7 @@ eliminateKnots witness net = go (melt net)
         let f' = go f -- innermost first: body is knot-free below here
             body =
               runPullback
-                (loom (unsafeCoerce f' :: Net (,) Pullback (j, x) (j, y)))
+                (weave (unsafeCoerce f' :: Net (,) Pullback (j, x) (j, y)))
          in Lift (Pullback (solveAffine dim body))
       Copy -> unreachableRow "Copy"
       Discard -> unreachableRow "Discard"

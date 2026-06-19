@@ -13,7 +13,7 @@
 -- mode, lifted into a 'Category' so it can be used as the base arrow for
 -- 'Trace'.
 --
--- With the 'Trace' @(,)@ instance, 'reify' \"Trace Diff\" runs forward and
+-- With the 'Trace' @(,)@ instance, 'realise' \"Trace Diff\" runs forward and
 -- pulls back — reverse-mode ADiff with no GADT changes.  The backward pass
 -- through a 'Trace' uses a lazy fixpoint (the implicit function theorem):
 -- the gradient at a fixed point solves its own affine equation.
@@ -22,11 +22,11 @@
 --
 -- Differentiating @x²@ through a circuit:
 --
--- >>> import Trace (Trace(..), reify)
+-- >>> import Trace (Trace(..), realise)
 -- >>> import Circuit.AD
 -- >>> import Prelude hiding (Monoid, id, (.))
 -- >>> let f = Lift (Diff (\x -> (x * x, \dx' -> 2 * x * dx'))) :: Trace (,) Diff Double Double
--- >>> let (y, pullback) = runDiff (reify f) 3.0
+-- >>> let (y, pullback) = runDiff (realise f) 3.0
 -- >>> y
 -- 9.0
 -- >>> pullback 1.0
@@ -79,7 +79,7 @@ import NumHask.Diff (Diff, Diff', runDiff, pattern Diff)
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
--- >>> import Trace (Trace (..), reify)
+-- >>> import Trace (Trace (..), realise)
 -- >>> import Prelude hiding (id, (.))
 
 -- | 'Trace' for 'Diff' with the @(,)@ tensor.
@@ -521,7 +521,7 @@ instance MonoidalP (Diff' p) where
 -- ---------------------------------------------------------------------------
 
 -- | @2x² + 3x + 5@ built from 'par', 'dup', and 'plus' on the @Diff@ arrow.
--- No 'Net' needed — the instances are the denotations the rows will reify to.
+-- No 'Net' needed — the instances are the denotations the rows will realise to.
 --
 -- The gradient is @4x + 3@, so at @x = 1@: value 10, gradient 7.
 --

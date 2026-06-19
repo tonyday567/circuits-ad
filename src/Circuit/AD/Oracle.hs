@@ -4,9 +4,9 @@
 --
 -- Three claims, falsifiable by property test:
 --
--- 1. __Primitive agreement__ — @reify \\@Diff@ matches @rad1@ on the same
+-- 1. __Primitive agreement__ — @realise \\@Diff@ matches @rad1@ on the same
 --    primitive set.
--- 2. __Triangle identity__ — @lower . encode \\@Diff = reify \\@Diff@, and both
+-- 2. __Triangle identity__ — @lower . encode \\@Diff = realise \\@Diff@, and both
 --    match ad-delcont.
 -- 3. __Knot differentiation__ — @traceNFrom \\@Diff@ differentiates through a
 --    fixed-point loop.
@@ -14,7 +14,7 @@
 -- = Pointwise transposition = lens pullback
 --
 -- Transposing a 'Net Diff' at a point does not need new syntax — the lens
--- already computes the transpose.  @snd (runDiff (loom n) a)@ is the
+-- already computes the transpose.  @snd (runDiff (weave n) a)@ is the
 -- pullback (cotangent→cotangent map) at @a@, and the forward pass of
 -- any hypothetical @transposeAt n a@ would be exactly that function.
 -- The structural rows (Copy↔Add, etc.) are self-dual at the instance
@@ -34,7 +34,7 @@ module Circuit.AD.Oracle
   )
 where
 
-import Circuit (Trace (..), reify)
+import Circuit (Trace (..), realise)
 import Circuit.AD (Diff, Diff', traceNFrom, pattern Diff)
 import Control.Category ((>>>))
 import Numeric.AD.DelCont (rad1)
@@ -44,7 +44,7 @@ import Prelude hiding (id, (.))
 -- >>> 1 + 1 :: Int
 -- 2
 -- >>> import Control.Category ((>>>))
--- >>> import Trace (Trace(..), reify)
+-- >>> import Trace (Trace(..), realise)
 -- >>> import Circuit.AD (Diff, Diff' (..), pattern Diff, traceNFrom)
 -- >>> import Numeric.AD.DelCont (rad1)
 -- >>> import Prelude hiding (id, (.))
@@ -62,7 +62,7 @@ sinSqr :: (Floating a) => a -> a
 sinSqr x = sin (x * x)
 
 -- ===========================================================================
--- Test 1: Primitive agreement — reify @Diff vs rad1
+-- Test 1: Primitive agreement — realise @Diff vs rad1
 -- ===========================================================================
 
 -- | @x²@ as a Trace Diff.
@@ -75,27 +75,27 @@ sinSqrCircuit =
   Lift (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
     >>> Lift (Diff (\x -> (sin x, \dx -> cos x * dx)))
 
--- | Derivative of @x²@ agrees: @reify @Diff@ vs @rad1@.
+-- | Derivative of @x²@ agrees: @realise @Diff@ vs @rad1@.
 --
--- >>> let test x = let (yc, pb) = runDiff (reify sqrCircuit) x; (ya, ga) = rad1 sqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
+-- >>> let test x = let (yc, pb) = runDiff (realise sqrCircuit) x; (ya, ga) = rad1 sqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
 -- >>> all test [-2.0, -1.0, 0.0, 0.5, 1.0, 2.5, 10.0]
 -- True
 
 -- | Derivative of @sin(x²)@ agrees: composition of two Diffs vs @rad1@.
 --
--- >>> let test x = let (yc, pb) = runDiff (reify sinSqrCircuit) x; (ya, ga) = rad1 sinSqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
+-- >>> let test x = let (yc, pb) = runDiff (realise sinSqrCircuit) x; (ya, ga) = rad1 sinSqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
 -- >>> all test [0.1, 0.5, 1.0]
 -- True
 
 -- ===========================================================================
--- Test 2: Triangle identity — lower . encode = reify
+-- Test 2: Triangle identity — lower . encode = realise
 -- ===========================================================================
 
 -- | The triangle holds on a simple Diff circuit.
 --
 -- >>> import Trace (encode, lower)
 -- >>> let circuit = sqrCircuit
--- >>> let (yr, pb) = runDiff (reify circuit) 3.0
+-- >>> let (yr, pb) = runDiff (realise circuit) 3.0
 -- >>> let (ye, pbe) = lower (encode circuit) 3.0
 -- >>> abs (yr - ye) < 1e-10 && abs (pb 1.0 - pbe 1.0) < 1e-10
 -- True
@@ -104,7 +104,7 @@ sinSqrCircuit =
 --
 -- >>> import Trace (encode, lower)
 -- >>> let circuit = sinSqrCircuit
--- >>> let test x = let (yr, pb) = runDiff (reify circuit) x; (ye, pbe) = lower (encode circuit) x in abs (yr - ye) < 1e-10 && abs (pb 1.0 - pbe 1.0) < 1e-10
+-- >>> let test x = let (yr, pb) = runDiff (realise circuit) x; (ye, pbe) = lower (encode circuit) x in abs (yr - ye) < 1e-10 && abs (pb 1.0 - pbe 1.0) < 1e-10
 -- >>> all test [0.1, 0.5, 1.0, 2.0]
 -- True
 

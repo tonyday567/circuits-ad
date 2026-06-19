@@ -26,7 +26,7 @@ where
 
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Monoidal (MonoidalP (..))
-import Circuit.Net (Net, loom)
+import Circuit.Net (Net, weave)
 import Circuit.Traced (Traced (..))
 import Control.Category
 import Data.Bifunctor
@@ -145,5 +145,5 @@ instance (Monoid (->) a) => Monoid Pullback a where
 -- 'linearizeAt', and applying it to a cotangent @db@ yields the
 -- input cotangent @da@.
 evalPullback :: Net (,) Pullback b a -> b -> a
-evalPullback n = runPullback (loom n)
+evalPullback n = runPullback (weave n)
 {-# INLINE evalPullback #-}
