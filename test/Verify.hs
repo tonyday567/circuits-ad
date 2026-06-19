@@ -2,7 +2,7 @@
 
 module Main (main) where
 
-import Circuit (Circuit, reify)
+import Circuit (Trace, reify)
 import Circuit qualified
 import Circuit.AD
 import Circuit.AD.Pullback (evalPullback)
@@ -58,7 +58,7 @@ main = do
   assert "gradient" (pbLoop 1.0) (1.0 / (1.0 - 0.3) * 2.0 + 1.0)
 
   putStrLn "direct primitive via reify"
-  let (yPrim, pbPrim) = runDiff (reify (Circuit.Lift sq :: Circuit (,) Diff Double Double)) 3.0
+  let (yPrim, pbPrim) = runDiff (reify (Circuit.Lift sq :: Trace (,) Diff Double Double)) 3.0
   assert "value" yPrim 9.0
   assert "gradient" (pbPrim 1.0) 6.0
 
@@ -101,7 +101,7 @@ main = do
   assert "value" y6 10.0
   assert "gradient" (pb6 1.0) 5.0
 
-  putStrLn "Par-interior Knot preserved"
+  putStrLn "Par-interior Trace preserved"
   -- The knot body has zero channel self-coupling in the feedback wire,
   -- so the lazy 'Trace' knot converges without a forward seed.
   let innerBody =
@@ -110,7 +110,7 @@ main = do
               ((0.0, x + 2.0 * b), \(dx, dc) -> (dc, 2.0 * dc))
           ) ::
           Diff (Double, Double) (Double, Double)
-      innerKnot = Knot (Lift innerBody) :: Net (,) Diff Double Double
+      innerKnot = Trace (Lift innerBody) :: Net (,) Diff Double Double
       net = Par (Lift sq) innerKnot :: Net (,) Diff (Double, Double) (Double, Double)
       (y7, g7) = backprop net (3.0, 4.0)
       (gx, gb) = evalPullback g7 (1.0, 1.0)

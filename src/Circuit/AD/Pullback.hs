@@ -27,7 +27,7 @@ where
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net, loom)
-import Circuit.Traced (Trace (..))
+import Circuit.Traced (Traced (..))
 import Control.Category
 import Data.Bifunctor
 import Prelude hiding (Monoid, id, (.))
@@ -36,7 +36,7 @@ import Prelude hiding (Monoid, id, (.))
 -- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
 -- >>> import Circuit.Monoidal (MonoidalP (..))
 -- >>> import Circuit.Net (Net (..))
--- >>> import Circuit.Traced (Trace (..))
+-- >>> import Circuit.Traced (Traced (..))
 -- >>> import Prelude hiding (id, (.))
 
 -- | A linear map from output cotangents to input cotangents, read as
@@ -90,7 +90,7 @@ instance MonoidalP Pullback where
 -- >>> let body = Pullback (\(dx', dc) -> (2.0 * dc, dx')) :: Pullback (Double, Double) (Double, Double)
 -- >>> runPullback (trace body) 1.0
 -- 2.0
-instance Trace Pullback (,) where
+instance Traced Pullback (,) where
   trace (Pullback f) = Pullback $ \dc ->
     let ~(dx, db) = f (dx, dc)
      in db

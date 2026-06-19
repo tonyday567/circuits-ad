@@ -33,7 +33,7 @@ assert name got expected =
 -- Then @db = dx + 2*dc = 4*dc@.
 scalarKnot :: Net (,) Pullback FieldStar FieldStar
 scalarKnot =
-  Knot
+  Trace
     ( Lift
         ( Pullback $ \(FieldStar dx, FieldStar dc) ->
             (FieldStar (0.5 * dx + dc), FieldStar (dx + 2.0 * dc))
@@ -71,7 +71,7 @@ runStarEliminateTests = do
                 FieldStar (dx1 + dx2 + dc)
               ) ::
                 ([FieldStar], FieldStar)
-      vecKnot = Knot (Lift vecBody) :: Net (,) Pullback FieldStar FieldStar
+      vecKnot = Trace (Lift vecBody) :: Net (,) Pullback FieldStar FieldStar
       eliminatedVec = eliminateKnots [FieldStar 0, FieldStar 0] vecKnot
       FieldStar gVec = evalPullback eliminatedVec (FieldStar 1.0)
       expectedVec = (30.0 / 11.0) + (40.0 / 11.0) + 1.0
@@ -105,7 +105,7 @@ runStarEliminateTests = do
               )
           ) ::
           Diff' () (FieldStar, FieldStar) (FieldStar, FieldStar)
-      innerKnot = Knot (Lift innerBody) :: Net (,) (Diff' ()) FieldStar FieldStar
+      innerKnot = Trace (Lift innerBody) :: Net (,) (Diff' ()) FieldStar FieldStar
       (FieldStar y, g) = backprop innerKnot (FieldStar 4.0)
       gElim = eliminateKnots (FieldStar 0) g
       FieldStar gLazy = evalPullback g (FieldStar 1.0)

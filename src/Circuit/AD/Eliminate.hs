@@ -6,13 +6,13 @@
 --
 -- A 'Net (,) Pullback' built by 'Circuit.AD.linearizeNet' is linear by
 -- construction: every 'Lift' is a pointwise pullback, every 'Compose' is
--- function composition, and every 'Knot' ties an affine feedback equation.
+-- function composition, and every 'Trace' ties an affine feedback equation.
 -- This module eliminates those knots in closed form using the Kleene star
 -- ('NumHask.Algebra.Ring.StarSemiring' for scalar channels,
 -- 'Circuit.AD.Matrix.starMatrix' for vector channels).
 --
 -- The pass is /structural/: it recurses through the net, replaces each
--- 'Knot' (innermost first — Bekić order) with a single solved 'Lift', and
+-- 'Trace' (innermost first — Bekić order) with a single solved 'Lift', and
 -- leaves every other constructor in place.  The result preserves the net's
 -- shape minus its loops, so it can be evaluated on strict carriers without
 -- the lazy-knot divergence that 'Trace' @Pullback (,)@ suffers when channel
@@ -22,7 +22,7 @@ module Circuit.AD.Eliminate
   ( -- * Channel abstraction
     StarChannel (..),
 
-    -- * Knot elimination
+    -- * Trace elimination
     eliminateKnots,
   )
 where
@@ -167,13 +167,13 @@ solveAffine dim body dc =
 -- | Eliminate all @(,)@ knots in a linear pullback net, structurally.
 --
 -- Structural rows are melted first ('Circuit.AD.Melt.melt'); then the
--- recursion replaces each 'Knot' — innermost first, so a knot body handed
+-- recursion replaces each 'Trace' — innermost first, so a knot body handed
 -- to 'solveAffine' is already loop-free and can be evaluated by plain
 -- 'loom' — with one solved 'Lift'.  Everything else keeps its shape.
 --
 -- __The channel witness__: pass a sample channel cotangent (its value is
 -- irrelevant; its /dimension/ is read with 'channelDim').  The channel type
--- inside 'Knot' is existential, so the witness is matched by 'unsafeCoerce'.
+-- inside 'Trace' is existential, so the witness is matched by 'unsafeCoerce'.
 --
 -- __Precondition (caller-checked, not machine-checked)__: every knot in the
 -- net has channel type @j@ with the witness's dimension.  This holds for
@@ -181,7 +181,7 @@ solveAffine dim body dc =
 -- /not/ guaranteed for arbitrary nets — distinct knots may close over
 -- distinct channel types, and a mismatched coercion is undefined behaviour.
 -- The principled fix is evidence on the row: a 'StarChannel' dictionary
--- captured by the 'Knot' constructor at linearization time, which would
+-- captured by the 'Trace' constructor at linearization time, which would
 -- delete both the witness argument and the coercion.  That is a @circuits@
 -- GADT decision, not patchable from this module.
 --
@@ -190,7 +190,7 @@ solveAffine dim body dc =
 --
 -- >>> :{
 -- let body (FieldStar dj, dc) = (FieldStar (0.3 * dj + 2.0 * dc), dj)
---     net = Knot (Lift (Pullback body)) :: Net (,) Pullback Double Double
+--     net = Trace (Lift (Pullback body)) :: Net (,) Pullback Double Double
 -- :}
 --
 -- >>> let solved = eliminateKnots (FieldStar 0) net
@@ -212,7 +212,7 @@ eliminateKnots witness net = go (melt net)
       Compose g f -> Compose (go g) (go f)
       Par f g -> Par (go f) (go g)
       Swap -> Swap
-      Knot f ->
+      Trace f ->
         let f' = go f -- innermost first: body is knot-free below here
             body =
               runPullback

@@ -11,21 +11,21 @@
 -- given a cotangent @db@ on the output, produce a cotangent @da@ on the input.
 -- This is the same shape as Conal Elliott's \"Simple Essence of AD\" reverse
 -- mode, lifted into a 'Category' so it can be used as the base arrow for
--- 'Circuit'.
+-- 'Trace'.
 --
--- With the 'Trace' @(,)@ instance, 'reify' \"Circuit Diff\" runs forward and
+-- With the 'Trace' @(,)@ instance, 'reify' \"Trace Diff\" runs forward and
 -- pulls back — reverse-mode ADiff with no GADT changes.  The backward pass
--- through a 'Knot' uses a lazy fixpoint (the implicit function theorem):
+-- through a 'Trace' uses a lazy fixpoint (the implicit function theorem):
 -- the gradient at a fixed point solves its own affine equation.
 --
 -- = Example
 --
 -- Differentiating @x²@ through a circuit:
 --
--- >>> import Circuit (Circuit(..), reify)
+-- >>> import Trace (Trace(..), reify)
 -- >>> import Circuit.AD
 -- >>> import Prelude hiding (Monoid, id, (.))
--- >>> let f = Lift (Diff (\x -> (x * x, \dx' -> 2 * x * dx'))) :: Circuit (,) Diff Double Double
+-- >>> let f = Lift (Diff (\x -> (x * x, \dx' -> 2 * x * dx'))) :: Trace (,) Diff Double Double
 -- >>> let (y, pullback) = runDiff (reify f) 3.0
 -- >>> y
 -- 9.0
@@ -69,7 +69,7 @@ import Circuit.Dagger qualified as CD
 import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net (..))
 import Circuit.Net qualified
-import Circuit.Traced (Trace (..))
+import Circuit.Traced (Traced (..))
 import Control.Category
 import Data.Bifunctor
 import NumHask.Algebra.Additive qualified as NHA
@@ -79,7 +79,7 @@ import NumHask.Diff (Diff, Diff', runDiff, pattern Diff)
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
--- >>> import Circuit (Circuit (..), reify)
+-- >>> import Trace (Trace (..), reify)
 -- >>> import Prelude hiding (id, (.))
 
 -- | 'Trace' for 'Diff' with the @(,)@ tensor.
@@ -107,7 +107,7 @@ import Prelude hiding (Monoid, id, (.))
 -- because GHC's heap holds the graph.  For linear backward maps this is a
 -- Neumann series computed lazily; for general maps it is the implicit function
 -- theorem as a lazy knot.
-instance Trace (Diff' p) (,) where
+instance Traced (Diff' p) (,) where
   trace (Diff body) = Diff $ \b ->
     let -- Forward: standard lazy knot
         ~((a, c), backward) = body (a, b)
@@ -163,7 +163,7 @@ instance Trace (Diff' p) (,) where
 -- 12.0
 -- >>> pb 1.0
 -- 8.0
-instance Trace (Diff' p) Either where
+instance Traced (Diff' p) Either where
   trace (Diff body) = Diff $ \b ->
     let -- Forward: iterate, collecting pullbacks in execution order.
         goFwd x =
@@ -352,15 +352,15 @@ traceStar = trace
 -- Use 'Circuit.AD.Pullback.evalPullback' to evaluate the resulting net
 -- at a single output cotangent.
 --
--- __Caveat__: /Fixpoints are lazy on both passes./  Forward 'Knot's tie
--- the same lazy knot as 'Trace' @Diff@; the 'Knot's in the returned net
+-- __Caveat__: /Fixpoints are lazy on both passes./  Forward 'Trace's tie
+-- the same lazy knot as 'Trace' @Diff@; the 'Trace's in the returned net
 -- tie the lazy 'Trace' @Pullback@ knot.  For strict carriers with
 -- nonzero channel self-coupling, /both/ diverge.  The forward side needs
 -- an iteration policy (a @backpropNFrom@, mirroring 'traceNFrom').  The
 -- backward side deserves better: the pullback net is linear by
 -- construction, so its knots satisfy affine equations and can be
 -- /eliminated/ — probe the knot body for its channel matrix,
--- 'Circuit.AD.Matrix.starMatrix' it, and replace the 'Knot' with a 'Lift'.
+-- 'Circuit.AD.Matrix.starMatrix' it, and replace the 'Trace' with a 'Lift'.
 -- That elimination pass is state elimination on a linear circuit: the
 -- linear-representation normal form that @kleeneSimplify@ gestures at,
 -- landing where it can actually be lawful.
@@ -393,7 +393,7 @@ fromDiffAt (Diff f) a = Pullback (snd (f a))
 -- | Run a 'Net Diff' forward and build the transposed pullback net.
 --
 -- This linearizes the 'Net' directly, without 'Circuit.Net.melt', so
--- 'Knot's inside 'Par' arms survive as 'Knot's in the pullback net.
+-- 'Trace's inside 'Par' arms survive as 'Trace's in the pullback net.
 linearizeAt ::
   forall p a b.
   Net (,) (Diff' p) a b ->
@@ -407,7 +407,7 @@ linearizeAt = linearizeNet
 -- 'Discard', 'Zero') are converted to point-independent 'Lift'
 -- pullbacks using the 'Diff' dictionaries the constructors already
 -- carry (copy↦plus, add↦dup, discard↦zero, zero↦discard).  Because the
--- recursion never melts the net into a 'Circuit' first, feedback loops
+-- recursion never melts the net into a 'Trace' first, feedback loops
 -- under 'Par' remain visible to future star-elimination passes.
 linearizeNet ::
   forall p a b.
@@ -439,17 +439,17 @@ linearizeNet n a = case n of
      in (fst (runDiff (plus @(Diff' p) @b) (x, y)), Lift (Pullback (\dc -> (dc, dc))))
   Zero ->
     (fst (runDiff (zero @(Diff' p) @b) ()), Lift (Pullback (const ())))
-  Knot f ->
+  Trace f ->
     let ~((x, b), f') = linearizeNet f (x, a)
-     in (b, Knot f')
+     in (b, Trace f')
 
--- | Pointwise linearization over the core 'Circuit' language.  The
+-- | Pointwise linearization over the core 'Trace' language.  The
 -- bimonoid rows ('Copy', 'Plus', ...) have already been melted into
 -- 'Lift's by 'Circuit.Net.melt', so this recursion only sees 'Lift',
--- 'Compose', and 'Knot'.
+-- 'Compose', and 'Trace'.
 linearizeCircuit ::
   forall p a b.
-  C.Circuit (,) (Diff' p) a b ->
+  C.Trace (,) (Diff' p) a b ->
   a ->
   (b, Net (,) Pullback b a)
 linearizeCircuit (C.Lift (Diff f)) a =
@@ -459,9 +459,9 @@ linearizeCircuit (C.Compose g f) a =
   let (b, f') = linearizeCircuit f a
       (c, g') = linearizeCircuit g b
    in (c, Compose f' g')
-linearizeCircuit (C.Knot f) a =
+linearizeCircuit (C.Trace f) a =
   let ~((x, b), f') = linearizeCircuit f (x, a)
-   in (b, Knot f')
+   in (b, Trace f')
 
 -- ---------------------------------------------------------------------------
 -- Comonoid Diff — copy and discard for the differentiable arrow.

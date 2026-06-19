@@ -2,14 +2,14 @@
 --
 -- 'Circuit.Net.melt' melts bimonoid rows ('Copy', 'Discard', 'Plus',
 -- 'Zero') by /running/ the net.  That is fine for knot-free wiring, but it
--- eagerly ties any lazy 'Knot' encountered along the way — so a net with
+-- eagerly ties any lazy 'Trace' encountered along the way — so a net with
 -- non-zero channel self-coupling diverges before a subsequent star-elimination
 -- pass can save it.
 --
 -- This pass performs the same row elimination /without/ running anything.
 -- Each structural row is replaced by the corresponding 'Pullback' arrow,
 -- lifted into a 'Net' node.  The result is semantically equivalent but
--- contains only 'Lift', 'Compose', 'Swap', 'Par' and 'Knot' constructors.
+-- contains only 'Lift', 'Compose', 'Swap', 'Par' and 'Trace' constructors.
 -- After melting, 'Circuit.AD.Eliminate.eliminateKnots' can remove the knots
 -- in closed form.
 module Circuit.AD.Melt
@@ -33,7 +33,7 @@ melt = \case
   Compose g f -> Compose (melt g) (melt f)
   Par f g -> Par (melt f) (melt g)
   Swap -> Swap
-  Knot f -> Knot (melt f)
+  Trace f -> Trace (melt f)
   Copy -> Lift copy
   Discard -> Lift discard
   Plus -> Lift plus
