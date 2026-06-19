@@ -66,11 +66,11 @@ sinSqr x = sin (x * x)
 -- ===========================================================================
 
 -- | @x²@ as a Circuit Diff.
-sqrCircuit :: Circuit Diff (,) Double Double
+sqrCircuit :: Circuit (,) Diff Double Double
 sqrCircuit = Lift (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
 
 -- | @sin(x²)@ as two composed Lift Diffs.
-sinSqrCircuit :: Circuit Diff (,) Double Double
+sinSqrCircuit :: Circuit (,) Diff Double Double
 sinSqrCircuit =
   Lift (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
     >>> Lift (Diff (\x -> (sin x, \dx -> cos x * dx)))

@@ -1,7 +1,7 @@
 # Plan: star-elimination of `(,)`-knots and phantom-tagged `Diff`
 
 ## Goals
-1. Implement a star-elimination pass on linear `Net Pullback (,)` nets.
+1. Implement a star-elimination pass on linear `Net (,) Pullback` nets.
 2. Add a phantom type parameter to `Diff` so nested AD cannot mix perturbation tags.
 3. Add robust tests and clearly separate `circuits` (generic wiring) from `circuits-ad` (AD-specific algorithms).
 
@@ -34,14 +34,14 @@ API:
 ```haskell
 starEliminateKnot ::
   (StarChannel j, Additive (->) c) =>
-  Net Pullback (,) (j, b) (j, c) ->
-  Net Pullback (,) b c
+  Net (,) Pullback (j, b) (j, c) ->
+  Net (,) Pullback b c
 
 eliminateKnotsUniform ::
   (StarChannel j, Additive (->) c) =>
   Proxy j ->
-  Net Pullback (,) b c ->
-  Net Pullback (,) b c
+  Net (,) Pullback b c ->
+  Net (,) Pullback b c
 ```
 
 `starEliminateKnot` first recursively eliminates inner knots (uniform-channel assumption), probes the linear body for the self-coupling matrix `A`, the cross block `C·dc`, applies `starMatrix`/`NHR.star`, and replaces the `Knot` with a single `Lift (Pullback (\dc -> ...))`.

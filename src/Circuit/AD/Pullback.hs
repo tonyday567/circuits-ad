@@ -7,7 +7,7 @@
 -- (output cotangent) to @a@ (input cotangent).  Composition is plain
 -- function composition — the /reversal/ is not in this category, it is
 -- in how nets are built over it: 'Circuit.AD.linearizeAt' transposes a
--- @Net Diff (,) a b@ into a @Net Pullback (,) b a@, emitting
+-- @Net (,) Diff a b@ into a @Net (,) Pullback b a@, emitting
 -- @Compose f' g'@ for every source @Compose g f@.  Within an arrow the
 -- chain rule is then just @(.)@.
 --
@@ -29,6 +29,7 @@ import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net, loom)
 import Circuit.Traced (Trace (..))
 import Control.Category
+import Data.Bifunctor
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
@@ -143,6 +144,6 @@ instance (Monoid (->) a) => Monoid Pullback a where
 -- This is the one-shot reverse pass: the net was built by
 -- 'linearizeAt', and applying it to a cotangent @db@ yields the
 -- input cotangent @da@.
-evalPullback :: Net Pullback (,) b a -> b -> a
+evalPullback :: Net (,) Pullback b a -> b -> a
 evalPullback n = runPullback (loom n)
 {-# INLINE evalPullback #-}

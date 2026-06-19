@@ -27,7 +27,7 @@ import Prelude hiding (Monoid, id, (.))
 -- The 'Bimonoid' constraints carried by 'Copy', 'Discard', 'Plus' and 'Zero'
 -- guarantee that the corresponding 'Comonoid' / 'Monoid' methods exist for
 -- 'Pullback', so melting needs no forward execution.
-melt :: Net Pullback (,) a b -> Net Pullback (,) a b
+melt :: Net (,) Pullback a b -> Net (,) Pullback a b
 melt = \case
   Lift p -> Lift p
   Compose g f -> Compose (melt g) (melt f)

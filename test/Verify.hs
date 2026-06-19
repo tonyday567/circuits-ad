@@ -31,8 +31,11 @@ assert name got expected =
 sq :: Diff Double Double
 sq = Diff (\x -> (x * x, \d -> 2 * x * d))
 
+constD :: Double -> Diff Double Double
+constD c = Diff (\_ -> (c, const 0))
+
 -- | Net computing 2*x^2 via copy, parallel squares, then add.
-quadNet :: Net Diff (,) Double Double
+quadNet :: Net (,) Diff Double Double
 quadNet = Compose Plus (Compose (Par (Lift sq) (Lift sq)) Copy)
 
 -- | Linear feedback loop: x' = 0.3*x + 2*b, c = x + b.
@@ -55,7 +58,7 @@ main = do
   assert "gradient" (pbLoop 1.0) (1.0 / (1.0 - 0.3) * 2.0 + 1.0)
 
   putStrLn "direct primitive via reify"
-  let (yPrim, pbPrim) = runDiff (reify (Circuit.Lift sq :: Circuit Diff (,) Double Double)) 3.0
+  let (yPrim, pbPrim) = runDiff (reify (Circuit.Lift sq :: Circuit (,) Diff Double Double)) 3.0
   assert "value" yPrim 9.0
   assert "gradient" (pbPrim 1.0) 6.0
 
@@ -65,7 +68,7 @@ main = do
   assert "gradient" (pb1 1.0) 6.0
 
   putStrLn "NumHask polynomial (2x^2 + 3x + 5)"
-  let poly = 2 * id * id + 3 * id + 5 :: Diff Double Double
+  let poly = constD 2 * id * id + constD 3 * id + constD 5 :: Diff Double Double
       (y2, pb2) = runDiff poly 1.0
   assert "value" y2 10.0
   assert "gradient" (pb2 1.0) 7.0
@@ -107,8 +110,8 @@ main = do
               ((0.0, x + 2.0 * b), \(dx, dc) -> (dc, 2.0 * dc))
           ) ::
           Diff (Double, Double) (Double, Double)
-      innerKnot = Knot (Lift innerBody) :: Net Diff (,) Double Double
-      net = Par (Lift sq) innerKnot :: Net Diff (,) (Double, Double) (Double, Double)
+      innerKnot = Knot (Lift innerBody) :: Net (,) Diff Double Double
+      net = Par (Lift sq) innerKnot :: Net (,) Diff (Double, Double) (Double, Double)
       (y7, g7) = backprop net (3.0, 4.0)
       (gx, gb) = evalPullback g7 (1.0, 1.0)
   assert "value fst" (fst y7) 9.0

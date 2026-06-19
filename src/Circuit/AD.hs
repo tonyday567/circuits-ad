@@ -25,7 +25,7 @@
 -- >>> import Circuit (Circuit(..), reify)
 -- >>> import Circuit.AD
 -- >>> import Prelude hiding (Monoid, id, (.))
--- >>> let f = Lift (Diff (\x -> (x * x, \dx' -> 2 * x * dx'))) :: Circuit Diff (,) Double Double
+-- >>> let f = Lift (Diff (\x -> (x * x, \dx' -> 2 * x * dx'))) :: Circuit (,) Diff Double Double
 -- >>> let (y, pullback) = runDiff (reify f) 3.0
 -- >>> y
 -- 9.0
@@ -63,7 +63,7 @@ module Circuit.AD
 where
 
 import Circuit.AD.Pullback (Pullback (..))
-import Circuit.Circuit qualified as C
+import Circuit.Trace qualified as C
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
 import Circuit.Monoidal (MonoidalP (..))
@@ -71,6 +71,7 @@ import Circuit.Net (Net (..))
 import Circuit.Net qualified
 import Circuit.Traced (Trace (..))
 import Control.Category
+import Data.Bifunctor
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR
@@ -367,7 +368,7 @@ traceStar = trace
 -- >>> import Circuit.Net (Net (..))
 -- >>> import Circuit.AD.Pullback (evalPullback)
 -- >>> let sq = Diff (\x -> (x * x, \d -> 2 * x * d))
--- >>> let n = Compose Add (Compose (Par (Lift sq) (Lift sq)) Copy) :: Net Diff (,) Double Double
+-- >>> let n = Compose Add (Compose (Par (Lift sq) (Lift sq)) Copy) :: Net (,) Diff Double Double
 -- >>> let (y, g) = backprop n 3.0
 -- >>> y
 -- 18.0
@@ -375,9 +376,9 @@ traceStar = trace
 -- 12.0
 backprop ::
   forall p a b.
-  Net (Diff' p) (,) a b ->
+  Net (,) (Diff' p) a b ->
   a ->
-  (b, Net Pullback (,) b a)
+  (b, Net (,) Pullback b a)
 backprop = linearizeAt
 
 -- | Capture the pullback of a 'Diff' primitive at a primal point.
@@ -395,9 +396,9 @@ fromDiffAt (Diff f) a = Pullback (snd (f a))
 -- 'Knot's inside 'Par' arms survive as 'Knot's in the pullback net.
 linearizeAt ::
   forall p a b.
-  Net (Diff' p) (,) a b ->
+  Net (,) (Diff' p) a b ->
   a ->
-  (b, Net Pullback (,) b a)
+  (b, Net (,) Pullback b a)
 linearizeAt = linearizeNet
 
 -- | Pointwise linearization over the free 'Net' language.
@@ -410,9 +411,9 @@ linearizeAt = linearizeNet
 -- under 'Par' remain visible to future star-elimination passes.
 linearizeNet ::
   forall p a b.
-  Net (Diff' p) (,) a b ->
+  Net (,) (Diff' p) a b ->
   a ->
-  (b, Net Pullback (,) b a)
+  (b, Net (,) Pullback b a)
 linearizeNet n a = case n of
   Lift d ->
     let (b, pb) = runDiff d a
@@ -448,9 +449,9 @@ linearizeNet n a = case n of
 -- 'Compose', and 'Knot'.
 linearizeCircuit ::
   forall p a b.
-  C.Circuit (Diff' p) (,) a b ->
+  C.Circuit (,) (Diff' p) a b ->
   a ->
-  (b, Net Pullback (,) b a)
+  (b, Net (,) Pullback b a)
 linearizeCircuit (C.Lift (Diff f)) a =
   let (b, pb) = f a
    in (b, Lift (Pullback pb))
