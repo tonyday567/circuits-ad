@@ -9,7 +9,7 @@
 -- This pass performs the same row elimination /without/ running anything.
 -- Each structural row is replaced by the corresponding 'Pullback' arrow,
 -- lifted into a 'Net' node.  The result is semantically equivalent but
--- contains only 'Lift', 'Compose', 'Swap', 'Par' and 'Trace' constructors.
+-- contains only 'Lift', 'Compose', 'Swap', 'Par' and 'Knot' constructors.
 -- After melting, 'Circuit.AD.Eliminate.eliminateKnots' can remove the knots
 -- in closed form.
 module Circuit.AD.Melt
@@ -33,7 +33,7 @@ melt = \case
   Compose g f -> Compose (melt g) (melt f)
   Par f g -> Par (melt f) (melt g)
   Swap -> Swap
-  Trace f -> Trace (melt f)
+  Knot f -> Knot (melt f)
   Copy -> Lift copy
   Discard -> Lift discard
   Plus -> Lift plus

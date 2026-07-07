@@ -4,9 +4,9 @@
 --
 -- Three claims, falsifiable by property test:
 --
--- 1. __Primitive agreement__ — @realise \\@Diff@ matches @rad1@ on the same
+-- 1. __Primitive agreement__ — @run \\@Diff@ matches @rad1@ on the same
 --    primitive set.
--- 2. __Triangle identity__ — @lower . encode \\@Diff = realise \\@Diff@, and both
+-- 2. __Triangle identity__ — @lower . encode \\@Diff = run \\@Diff@, and both
 --    match ad-delcont.
 -- 3. __Knot differentiation__ — @traceNFrom \\@Diff@ differentiates through a
 --    fixed-point loop.
@@ -34,7 +34,7 @@ module Circuit.AD.Oracle
   )
 where
 
-import Circuit (Trace (..), realise)
+import Circuit (Trace (..), run)
 import Circuit.AD (Diff, Diff', traceNFrom, pattern Diff)
 import Control.Category ((>>>))
 import Numeric.AD.DelCont (rad1)
@@ -44,7 +44,7 @@ import Prelude hiding (id, (.))
 -- >>> 1 + 1 :: Int
 -- 2
 -- >>> import Control.Category ((>>>))
--- >>> import Trace (Trace(..), realise)
+-- >>> import Trace (Trace(..), run)
 -- >>> import Circuit.AD (Diff, Diff' (..), pattern Diff, traceNFrom)
 -- >>> import Numeric.AD.DelCont (rad1)
 -- >>> import Prelude hiding (id, (.))
@@ -62,40 +62,40 @@ sinSqr :: (Floating a) => a -> a
 sinSqr x = sin (x * x)
 
 -- ===========================================================================
--- Test 1: Primitive agreement — realise @Diff vs rad1
+-- Test 1: Primitive agreement — run @Diff vs rad1
 -- ===========================================================================
 
 -- | @x²@ as a Trace Diff.
 sqrCircuit :: Trace (,) Diff Double Double
-sqrCircuit = Lift (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
+sqrCircuit = Arr (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
 
 -- | @sin(x²)@ as two composed Lift Diffs.
 sinSqrCircuit :: Trace (,) Diff Double Double
 sinSqrCircuit =
-  Lift (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
-    >>> Lift (Diff (\x -> (sin x, \dx -> cos x * dx)))
+  Arr (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
+    >>> Arr (Diff (\x -> (sin x, \dx -> cos x * dx)))
 
--- | Derivative of @x²@ agrees: @realise @Diff@ vs @rad1@.
+-- | Derivative of @x²@ agrees: @run @Diff@ vs @rad1@.
 --
--- >>> let test x = let (yc, pb) = runDiff (realise sqrCircuit) x; (ya, ga) = rad1 sqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
+-- >>> let test x = let (yc, pb) = runDiff (run sqrCircuit) x; (ya, ga) = rad1 sqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
 -- >>> all test [-2.0, -1.0, 0.0, 0.5, 1.0, 2.5, 10.0]
 -- True
 
 -- | Derivative of @sin(x²)@ agrees: composition of two Diffs vs @rad1@.
 --
--- >>> let test x = let (yc, pb) = runDiff (realise sinSqrCircuit) x; (ya, ga) = rad1 sinSqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
+-- >>> let test x = let (yc, pb) = runDiff (run sinSqrCircuit) x; (ya, ga) = rad1 sinSqr x in abs (yc - ya) < 1e-10 && abs (pb 1.0 - ga) < 1e-10
 -- >>> all test [0.1, 0.5, 1.0]
 -- True
 
 -- ===========================================================================
--- Test 2: Triangle identity — lower . encode = realise
+-- Test 2: Triangle identity — lower . encode = run
 -- ===========================================================================
 
 -- | The triangle holds on a simple Diff circuit.
 --
 -- >>> import Trace (encode, lower)
 -- >>> let circuit = sqrCircuit
--- >>> let (yr, pb) = runDiff (realise circuit) 3.0
+-- >>> let (yr, pb) = runDiff (run circuit) 3.0
 -- >>> let (ye, pbe) = lower (encode circuit) 3.0
 -- >>> abs (yr - ye) < 1e-10 && abs (pb 1.0 - pbe 1.0) < 1e-10
 -- True
@@ -104,7 +104,7 @@ sinSqrCircuit =
 --
 -- >>> import Trace (encode, lower)
 -- >>> let circuit = sinSqrCircuit
--- >>> let test x = let (yr, pb) = runDiff (realise circuit) x; (ye, pbe) = lower (encode circuit) x in abs (yr - ye) < 1e-10 && abs (pb 1.0 - pbe 1.0) < 1e-10
+-- >>> let test x = let (yr, pb) = runDiff (run circuit) x; (ye, pbe) = lower (encode circuit) x in abs (yr - ye) < 1e-10 && abs (pb 1.0 - pbe 1.0) < 1e-10
 -- >>> all test [0.1, 0.5, 1.0, 2.0]
 -- True
 

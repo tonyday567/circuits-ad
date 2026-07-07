@@ -2,13 +2,13 @@
 
 module Main (main) where
 
-import Circuit (Trace, realise)
+import Circuit (Trace, run)
 import Circuit qualified
 import Circuit.AD
 import Circuit.AD.Pullback (evalPullback)
-import Circuit.Monoidal (MonoidalP (..))
+import Circuit.Monoidal (Action (..))
 import Circuit.Net (Net (..))
-import Circuit.Traced (trace)
+import Circuit.Trace (trace)
 import MatrixStar (runMatrixStarTests)
 import NumHask.Diff ()
 import NumHask.Prelude
@@ -57,8 +57,8 @@ main = do
   assert "value" yLoop (1.0 / (1.0 - 0.3) * 2.0 + 1.0)
   assert "gradient" (pbLoop 1.0) (1.0 / (1.0 - 0.3) * 2.0 + 1.0)
 
-  putStrLn "direct primitive via realise"
-  let (yPrim, pbPrim) = runDiff (realise (Circuit.Lift sq :: Trace (,) Diff Double Double)) 3.0
+  putStrLn "direct primitive via run"
+  let (yPrim, pbPrim) = runDiff (run (Circuit.Arr sq :: Trace (,) Diff Double Double)) 3.0
   assert "value" yPrim 9.0
   assert "gradient" (pbPrim 1.0) 6.0
 
@@ -110,7 +110,7 @@ main = do
               ((0.0, x + 2.0 * b), \(dx, dc) -> (dc, 2.0 * dc))
           ) ::
           Diff (Double, Double) (Double, Double)
-      innerKnot = Trace (Lift innerBody) :: Net (,) Diff Double Double
+      innerKnot = Knot (Lift innerBody) :: Net (,) Diff Double Double
       net = Par (Lift sq) innerKnot :: Net (,) Diff (Double, Double) (Double, Double)
       (y7, g7) = backprop net (3.0, 4.0)
       (gx, gb) = evalPullback g7 (1.0, 1.0)

@@ -1,5 +1,12 @@
 # Plan: star-elimination of `(,)`-knots and phantom-tagged `Diff`
 
+**Status**: implemented.  The original design assumed a uniform channel type
+across the whole net and a single `Proxy` witness.  The implementation instead
+uses evidence-carrying trace constructors (`TraceE` / `SigKnotE`) so that each
+knot carries its own `StarChannelDict`.  This removes the uniform-channel
+assumption and the `unsafeCoerce`.  See `how-linearize-net-dissolved.md` for
+the dependent-optics / coend interpretation.
+
 ## Goals
 1. Implement a star-elimination pass on linear `Net (,) Pullback` nets.
 2. Add a phantom type parameter to `Diff` so nested AD cannot mix perturbation tags.
@@ -32,21 +39,27 @@ Instances:
 API:
 
 ```haskell
-starEliminateKnot ::
-  (StarChannel j, Additive (->) c) =>
-  Net (,) Pullback (j, b) (j, c) ->
-  Net (,) Pullback b c
+-- | Evidence-carrying 'Diff' / 'Pullback' trace.  The witness records the
+-- channel dimension (for vector channels) and carries the 'StarChannel'
+-- dictionary.
+traceStarNet ::
+  (StarChannel j, ChannelDict arr j ~ StarChannelDict j) =>
+  j ->
+  Net (,) arr (j, b) (j, c) ->
+  Net (,) arr b c
 
-eliminateKnotsUniform ::
-  (StarChannel j, Additive (->) c) =>
-  Proxy j ->
-  Net (,) Pullback b c ->
-  Net (,) Pullback b c
+-- | Eliminate every 'TraceE' in a linear 'Pullback' net.
+-- Each knot is solved with its own 'StarChannelDict'; knots with different
+-- channel types or dimensions are handled independently.
+eliminateKnots ::
+  Net (,) Pullback b a ->
+  Net (,) Pullback b a
 ```
 
-`starEliminateKnot` first recursively eliminates inner knots (uniform-channel assumption), probes the linear body for the self-coupling matrix `A`, the cross block `C·dc`, applies `starMatrix`/`NHR.star`, and replaces the `Knot` with a single `Lift (Pullback (\dc -> ...))`.
-
-`eliminateKnotsUniform` walks the net and applies `starEliminateKnot` at every `Knot`. It requires a `Proxy j` witness because the channel type is existential in `Net`.
+`eliminateKnots` first melts structural rows, then recursively replaces each
+`TraceE` with a single `Lift (Pullback (\dc -> ...))`.  The body is probed for
+its self-coupling matrix `A`, the cross block `C·dc`, and `starMatrix` solves
+the affine feedback equation.
 
 ### Why this design
 - It reuses the existing `Hasknum.Matrix.starMatrix` and `NHR.StarSemiring` infrastructure.
@@ -118,11 +131,14 @@ Rename `Diff` to `Diff' ()` everywhere. That is cleaner long-term but breaks eve
 - `src/Circuit/AD/Pullback.hs` — no structural change; confirm `Pullback` remains untagged.
 - `src/Circuit/AD/Star.hs` — update signatures to `Diff' p`.
 - `src/Circuit/AD/Oracle.hs` — update signatures to `Diff' p`.
-- `src/Circuit/AD/Eliminate.hs` — new module.
+- `src/Circuit/AD/Eliminate.hs` — star-elimination pass, now `unsafeCoerce`-free.
+- `src/Circuit/AD/StarChannel.hs` — `StarChannel` class, `StarChannelDict`, and the `FieldStar` orphan adapter.
+- `src/Circuit/AD/Melt.hs` — preserve `TraceE` evidence when melting.
+- `src/Circuit/AD.hs` — preserve `TraceE` evidence in `linearizeAt`, re-export eliminable trace builders.
 - `test/Verify.hs` — import and run new test modules.
-- `test/StarEliminate.hs` — new.
-- `test/Tags.hs` — new.
-- `circuits-ad.cabal` — add `Circuit.AD.Eliminate` to `exposed-modules` and new test modules to `other-modules`.
+- `test/StarEliminate.hs` — star-elimination tests, including two-knot mixed-dimension test.
+- `test/Tags.hs` — phantom-tag tests.
+- `circuits-ad.cabal` — add `Circuit.AD.Eliminate` and `Circuit.AD.StarChannel` to `exposed-modules`.
 
 ## 5. Verification
 - `cabal build all`

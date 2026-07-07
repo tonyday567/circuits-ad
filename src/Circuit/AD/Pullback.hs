@@ -25,18 +25,21 @@ module Circuit.AD.Pullback
 where
 
 import Circuit.Dagger (Comonoid (..), Monoid (..))
-import Circuit.Monoidal (MonoidalP (..))
-import Circuit.Net (Net, weave)
-import Circuit.Traced (Traced (..))
+import Circuit.Layer (run)
+import Circuit.Monoidal (Action (..))
+import Circuit.Monoidal.Category (Monoidal (..))
+import Circuit.Net (Net)
+import Circuit.Trace (Traced (..))
 import Control.Category
 import Data.Bifunctor
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
 -- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
--- >>> import Circuit.Monoidal (MonoidalP (..))
+-- >>> import Circuit.Monoidal (Action (..))
+-- >>> import Circuit.Monoidal.Category (Monoidal (..))
 -- >>> import Circuit.Net (Net (..))
--- >>> import Circuit.Traced (Traced (..))
+-- >>> import Circuit.Trace (Traced (..))
 -- >>> import Prelude hiding (id, (.))
 
 -- | A linear map from output cotangents to input cotangents, read as
@@ -63,7 +66,7 @@ instance Category Pullback where
 -- >>> let g = Pullback (*2) :: Pullback Int Int
 -- >>> runPullback (par f g) (3, 4)
 -- (4,8)
-instance MonoidalP Pullback where
+instance Action (,) Pullback where
   par (Pullback f) (Pullback g) = Pullback (Data.Bifunctor.bimap f g)
   {-# INLINE par #-}
 
@@ -90,7 +93,7 @@ instance MonoidalP Pullback where
 -- >>> let body = Pullback (\(dx', dc) -> (2.0 * dc, dx')) :: Pullback (Double, Double) (Double, Double)
 -- >>> runPullback (trace body) 1.0
 -- 2.0
-instance Traced Pullback (,) where
+instance Traced (,) Pullback where
   trace (Pullback f) = Pullback $ \dc ->
     let ~(dx, db) = f (dx, dc)
      in db
@@ -145,5 +148,11 @@ instance (Monoid (->) a) => Monoid Pullback a where
 -- 'linearizeAt', and applying it to a cotangent @db@ yields the
 -- input cotangent @da@.
 evalPullback :: Net (,) Pullback b a -> b -> a
-evalPullback n = runPullback (weave n)
+evalPullback n = runPullback (run n)
 {-# INLINE evalPullback #-}
+
+-- | Cartesian channel plumbing for pullbacks.
+instance Monoidal (,) Pullback where
+  assoc = Pullback (\((s, s'), x) -> (s, (s', x)))
+  assoc' = Pullback (\(s, (s', x)) -> ((s, s'), x))
+  braid = Pullback (\(s, (s', x)) -> (s', (s, x)))

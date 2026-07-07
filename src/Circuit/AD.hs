@@ -14,19 +14,19 @@
 -- 'Trace'.
 --
 -- With the 'Trace' @(,)@ instance, 'realise' \"Trace Diff\" runs forward and
--- pulls back — reverse-mode ADiff with no GADT changes.  The backward pass
--- through a 'Trace' uses a lazy fixpoint (the implicit function theorem):
+-- pulls back — reverse-mode AD with no GADT changes.  The backward pass
+-- through a 'Knot' uses a lazy fixpoint (the implicit function theorem):
 -- the gradient at a fixed point solves its own affine equation.
 --
 -- = Example
 --
 -- Differentiating @x²@ through a circuit:
 --
--- >>> import Trace (Trace(..), realise)
+-- >>> import Circuit.Trace (Trace(..), run)
 -- >>> import Circuit.AD
 -- >>> import Prelude hiding (Monoid, id, (.))
--- >>> let f = Lift (Diff (\x -> (x * x, \dx' -> 2 * x * dx'))) :: Trace (,) Diff Double Double
--- >>> let (y, pullback) = runDiff (realise f) 3.0
+-- >>> let f = Arr (Diff (\x -> (x * x, \dx' -> 2 * x * dx'))) :: Trace (,) Diff Double Double
+-- >>> let (y, pullback) = runDiff (run f) 3.0
 -- >>> y
 -- 9.0
 -- >>> pullback 1.0
@@ -63,13 +63,14 @@ module Circuit.AD
 where
 
 import Circuit.AD.Pullback (Pullback (..))
+import Circuit.Monoidal (Action (..))
+import Circuit.Monoidal.Category (Monoidal (..))
+import Circuit.Trace (Traced (..))
 import Circuit.Trace qualified as C
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
-import Circuit.Monoidal (MonoidalP (..))
 import Circuit.Net (Net (..))
 import Circuit.Net qualified
-import Circuit.Traced (Traced (..))
 import Control.Category
 import Data.Bifunctor
 import NumHask.Algebra.Additive qualified as NHA
@@ -79,7 +80,7 @@ import NumHask.Diff (Diff, Diff', runDiff, pattern Diff)
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
--- >>> import Trace (Trace (..), realise)
+-- >>> import Circuit.Trace (Trace (..), run)
 -- >>> import Prelude hiding (id, (.))
 
 -- | 'Trace' for 'Diff' with the @(,)@ tensor.
@@ -107,7 +108,7 @@ import Prelude hiding (Monoid, id, (.))
 -- because GHC's heap holds the graph.  For linear backward maps this is a
 -- Neumann series computed lazily; for general maps it is the implicit function
 -- theorem as a lazy knot.
-instance Traced (Diff' p) (,) where
+instance Traced (,) (Diff' p) where
   trace (Diff body) = Diff $ \b ->
     let -- Forward: standard lazy knot
         ~((a, c), backward) = body (a, b)
@@ -120,6 +121,36 @@ instance Traced (Diff' p) (,) where
   untrace (Diff f) = Diff $ \(a, b) ->
     let (c, back) = f b
      in ((a, c), Data.Bifunctor.second back)
+
+-- | Cartesian channel plumbing for 'Diff'.
+instance Monoidal (,) (Diff' p) where
+  assoc = Diff (\((s, s'), x) -> ((s, (s', x)), \(s'', (s''', x')) -> ((s'', s'''), x')))
+  assoc' = Diff (\(s, (s', x)) -> (((s, s'), x), \p -> case p of ((s'', s'''), x') -> (s'', (s''', x'))))
+  braid = Diff (\(s, (s', x)) -> ((s', (s, x)), \p -> case p of (s'', (s''', x')) -> (s''', (s'', x'))))
+
+-- | Cocartesian channel plumbing for 'Diff'.
+instance Monoidal Either (Diff' p) where
+  assoc =
+    Diff
+      ( \case
+          Left (Left a) -> (Left a, \case Left da -> Left (Left da); Right _ -> error "assoc")
+          Left (Right b) -> (Right (Left b), \case Right (Left db) -> Left (Right db); _ -> error "assoc")
+          Right c -> (Right (Right c), \case Right (Right dc) -> Right dc; _ -> error "assoc")
+      )
+  assoc' =
+    Diff
+      ( \case
+          Left a -> (Left (Left a), \case Left (Left da) -> Left da; _ -> error "assoc'")
+          Right (Left b) -> (Left (Right b), \case Left (Right db) -> Right (Left db); _ -> error "assoc'")
+          Right (Right c) -> (Right c, \case Right dc -> Right (Right dc); _ -> error "assoc'")
+      )
+  braid =
+    Diff
+      ( \case
+          Left a -> (Right (Left a), \case Right (Left da) -> Left da; _ -> error "braid")
+          Right (Left b) -> (Left b, \case Left db -> Right (Left db); _ -> error "braid")
+          Right (Right c) -> (Right (Right c), \case Right (Right dc) -> Right (Right dc); _ -> error "braid")
+      )
 
 -- | Trace for 'Diff' with the 'Either' tensor.
 --
@@ -163,7 +194,7 @@ instance Traced (Diff' p) (,) where
 -- 12.0
 -- >>> pb 1.0
 -- 8.0
-instance Traced (Diff' p) Either where
+instance Traced Either (Diff' p) where
   trace (Diff body) = Diff $ \b ->
     let -- Forward: iterate, collecting pullbacks in execution order.
         goFwd x =
@@ -368,7 +399,7 @@ traceStar = trace
 -- >>> import Circuit.Net (Net (..))
 -- >>> import Circuit.AD.Pullback (evalPullback)
 -- >>> let sq = Diff (\x -> (x * x, \d -> 2 * x * d))
--- >>> let n = Compose Add (Compose (Par (Lift sq) (Lift sq)) Copy) :: Net (,) Diff Double Double
+-- >>> let n = Compose (Lift (CD.plus :: Diff (Double, Double) Double)) (Compose (Par (Lift sq) (Lift sq)) Copy) :: Net (,) Diff Double Double
 -- >>> let (y, g) = backprop n 3.0
 -- >>> y
 -- 18.0
@@ -439,29 +470,25 @@ linearizeNet n a = case n of
      in (fst (runDiff (plus @(Diff' p) @b) (x, y)), Lift (Pullback (\dc -> (dc, dc))))
   Zero ->
     (fst (runDiff (zero @(Diff' p) @b) ()), Lift (Pullback (const ())))
-  Trace f ->
+  Knot f ->
     let ~((x, b), f') = linearizeNet f (x, a)
-     in (b, Trace f')
+     in (b, Knot f')
 
 -- | Pointwise linearization over the core 'Trace' language.  The
 -- bimonoid rows ('Copy', 'Plus', ...) have already been melted into
--- 'Lift's by 'Circuit.Net.melt', so this recursion only sees 'Lift',
--- 'Compose', and 'Trace'.
+-- 'Arr's by 'Circuit.Net.melt', so this recursion only sees 'Arr' and
+-- 'Knot'.
 linearizeCircuit ::
   forall p a b.
   C.Trace (,) (Diff' p) a b ->
   a ->
   (b, Net (,) Pullback b a)
-linearizeCircuit (C.Lift (Diff f)) a =
+linearizeCircuit (C.Arr (Diff f)) a =
   let (b, pb) = f a
    in (b, Lift (Pullback pb))
-linearizeCircuit (C.Compose g f) a =
-  let (b, f') = linearizeCircuit f a
-      (c, g') = linearizeCircuit g b
-   in (c, Compose f' g')
-linearizeCircuit (C.Trace f) a =
-  let ~((x, b), f') = linearizeCircuit f (x, a)
-   in (b, Trace f')
+linearizeCircuit (C.Knot f) a =
+  let ~((x, b), pb) = runDiff f (x, a)
+   in (b, Knot (Lift (Pullback pb)))
 
 -- ---------------------------------------------------------------------------
 -- Comonoid Diff — copy and discard for the differentiable arrow.
@@ -474,7 +501,7 @@ linearizeCircuit (C.Trace f) a =
 
 -- | Copy in D: the pullback is 'plus' (fan-in on the backward pass).
 --
--- >>> import Circuit.Monoidal (MonoidalP(..))
+-- >>> import Circuit.Monoidal (Action(..))
 -- >>> import Circuit.Dagger (Comonoid(..))
 -- >>> let (_, pb) = runDiff (dup :: Diff Int (Int, Int)) 5
 -- >>> pb (1, 2)
@@ -507,7 +534,7 @@ instance (Monoid (->) a) => Monoid (Diff' p) a where
 -- (4,8)
 -- >>> pb (1, 1)
 -- (1,2)
-instance MonoidalP (Diff' p) where
+instance Action (,) (Diff' p) where
   par (Diff f) (Diff g) = Diff $ \(a, c) ->
     let (b, fb) = f a; (d, gd) = g c
      in ((b, d), Data.Bifunctor.bimap fb gd)
