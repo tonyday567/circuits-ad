@@ -25,6 +25,7 @@ library
     Circuit.AD.Matrix
     Circuit.AD.Melt
     Circuit.AD.Oracle
+    Circuit.AD.Param
     Circuit.AD.Pullback
     Circuit.AD.Star
   build-depends:
