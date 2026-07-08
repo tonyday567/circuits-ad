@@ -112,6 +112,18 @@ toPrim (DiffP f) = TensorPrim (\p a -> fst (f p a)) (\p a db -> snd (f p a) db)
 -- 8
 -- >>> pb 1
 -- (2,())
+--
+-- Parameter gradients from both composed arrows accumulate (not just the
+-- outer one).  @addParam@ contributes @dpG = dy@; @dblParam@ contributes
+-- @dpF = dc@; composition must sum them via 'CD.plus'.
+--
+-- >>> let addParam = DiffP (\p x -> (x + p, \dy -> (dy, dy))) :: DiffP Int Int Int
+-- >>> let dblParam = DiffP (\p b -> (2 * b, \dc -> (2 * dc, dc))) :: DiffP Int Int Int
+-- >>> let (y, pb) = runDiffP (dblParam . addParam) 10 3
+-- >>> y
+-- 26
+-- >>> pb 1
+-- (2,3)
 instance (Monoid (->) p) => Category (DiffP p) where
   id = DiffP $ \_ a -> (a, \da -> (da, CD.zero ()))
   {-# INLINE id #-}
