@@ -33,6 +33,7 @@ library
     Circuit.AD.Eliminate
     Circuit.AD.Matrix
     Circuit.AD.Melt
+    Circuit.AD.Metric
     Circuit.AD.Oracle
     Circuit.AD.Param
     Circuit.AD.Pullback

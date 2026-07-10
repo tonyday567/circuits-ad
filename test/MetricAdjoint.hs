@@ -23,6 +23,7 @@ module MetricAdjoint
 where
 
 import Circuit.AD
+import Circuit.AD.Metric (adjointWith)
 import NumHask.Prelude
 import Prelude ()
 
@@ -150,33 +151,6 @@ assertV2 :: String -> (Double, Double) -> (Double, Double) -> IO ()
 assertV2 name (x, y) (x', y') = do
   assert (name ++ " fst") x x'
   assert (name ++ " snd") y y'
-
--- | Adjoint of a 'Diff' with respect to domain and codomain metrics.
---
--- The metric operations are themselves 'Diff's of type @Diff (point, vector)
--- vector@: the forward pass lowers or raises a vector at the given point.
--- We use only the forward pass for the adjoint; the pullback's point-slot
--- carries the metric derivative @∂g@ that @∇@ needs.
-adjointWith ::
-  -- | @g_a^-1@ — raise a covector on the domain to a vector
-  Diff (a, a) a ->
-  -- | @g_b@ — lower a vector on the codomain to a covector
-  Diff (b, b) b ->
-  -- | @J : a -> b@
-  Diff a b ->
-  -- | @J@ with its pullback conjugated to the @g@-adjoint.  The type is still
-  -- @Diff a b@ because the lens stores the forward map @a -> b@ and the
-  -- backward map @b -> a@; the adjoint lives in the pullback.
-  Diff a b
-adjointWith raiseA lowerB (Diff f) = Diff $ \x ->
-  let (y, jt) = f x
-   in ( y,
-        \db ->
-          let (lowered, _) = runDiff lowerB (y, db)
-              covectorA = jt lowered
-              (raised, _) = runDiff raiseA (x, covectorA)
-           in raised
-      )
 
 -- | Euclidean metric @g = δ@ on @R@: lower and raise are both the identity.
 euclidean1D :: Diff (Double, Double) Double
