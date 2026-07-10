@@ -63,14 +63,14 @@ module Circuit.AD
 where
 
 import Circuit.AD.Pullback (Pullback (..))
-import Circuit.Monoidal (Action (..))
-import Circuit.Monoidal.Category (Monoidal (..))
-import Circuit.Trace (Traced (..))
-import Circuit.Trace qualified as C
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
+import Circuit.Monoidal (Action (..))
+import Circuit.Monoidal.Category (Monoidal (..))
 import Circuit.Net (Net (..))
 import Circuit.Net qualified
+import Circuit.Trace (Traced (..))
+import Circuit.Trace qualified as C
 import Control.Category
 import Data.Bifunctor
 import NumHask.Algebra.Additive qualified as NHA
@@ -125,8 +125,8 @@ instance Traced (,) (Diff' p) where
 -- | Cartesian channel plumbing for 'Diff'.
 instance Monoidal (,) (Diff' p) where
   assoc = Diff (\((s, s'), x) -> ((s, (s', x)), \(s'', (s''', x')) -> ((s'', s'''), x')))
-  assoc' = Diff (\(s, (s', x)) -> (((s, s'), x), \p -> case p of ((s'', s'''), x') -> (s'', (s''', x'))))
-  braid = Diff (\(s, (s', x)) -> ((s', (s, x)), \p -> case p of (s'', (s''', x')) -> (s''', (s'', x'))))
+  assoc' = Diff (\(s, (s', x)) -> (((s, s'), x), \((s'', s'''), x') -> (s'', (s''', x'))))
+  braid = Diff (\(s, (s', x)) -> ((s', (s, x)), \(s'', (s''', x')) -> (s''', (s'', x'))))
 
 -- | Cocartesian channel plumbing for 'Diff'.
 instance Monoidal Either (Diff' p) where

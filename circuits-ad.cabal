@@ -4,8 +4,17 @@ version: 0.1.0.0
 license: BSD-3-Clause
 author: Tony Day
 maintainer: tonyday567@gmail.com
+category: math
 synopsis: Oracle tests: circuits reverse-mode AD against ad-delcont
+description:
+  Reverse-mode automatic differentiation for the circuits ecosystem.
+  Provides an oracle comparing circuit derivatives against ad-delcont,
+  plus eliminators, pullbacks, and star-semiring structure for AD.
 build-type: Simple
+
+source-repository head
+  type: git
+  location: https://github.com/tonyday567/circuits-ad
 
 common ghc-options-stanza
   ghc-options:
@@ -30,11 +39,11 @@ library
     Circuit.AD.Star
   build-depends:
     base >=4.18 && <5,
-    circuits,
-    numhask-free,
-    numhask,
-    ad-delcont,
-    transformers >=0.5,
+    circuits >=0.2 && <0.3,
+    numhask-free >=0.1 && <0.2,
+    numhask >=0.11 && <0.14,
+    ad-delcont >=0.5 && <0.6,
+    transformers >=0.5 && <0.7,
 
 test-suite verify
   import: ghc-options-stanza

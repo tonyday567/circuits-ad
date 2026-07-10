@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -- | Parameterised reverse-mode automatic differentiation.
@@ -38,18 +39,13 @@ module Circuit.AD.Param
   )
 where
 
-#ifdef __GLASGOW_HASKELL__
-import Control.Category
-import Data.Bifunctor
-#else
-import Circuit.Classes (Bifunctor (..), Category (..))
-#endif
-
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
 import Circuit.Monoidal (Action (..))
 import Circuit.Monoidal.Category (Monoidal (..))
-import NumHask.Diff (Diff', pattern Diff, runDiff)
+import Control.Category
+import Data.Bifunctor
+import NumHask.Diff (Diff', runDiff, pattern Diff)
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
@@ -125,7 +121,7 @@ toPrim (DiffP f) = TensorPrim (\p a -> fst (f p a)) (\p a db -> snd (f p a) db)
 -- >>> pb 1
 -- (2,3)
 instance (Monoid (->) p) => Category (DiffP p) where
-  id = DiffP $ \_ a -> (a, \da -> (da, CD.zero ()))
+  id = DiffP $ \_ a -> (a, (,CD.zero ()))
   {-# INLINE id #-}
 
   DiffP f . DiffP g = DiffP $ \p a ->
@@ -205,7 +201,7 @@ instance (Monoid (->) a, Monoid (->) p) => Comonoid (DiffP p) a where
   copy = DiffP $ \_ a -> ((a, a), \(da1, da2) -> (CD.plus (da1, da2), CD.zero ()))
   {-# INLINE copy #-}
 
-  discard = DiffP $ \_ _ -> ((), \_ -> (CD.zero (), CD.zero ()))
+  discard = DiffP $ \_ _ -> ((), const (CD.zero (), CD.zero ()))
   {-# INLINE discard #-}
 
 -- | Add in 'DiffP': forward add, backward copy.  The parameter gradient is
@@ -218,7 +214,7 @@ instance (Monoid (->) a, Monoid (->) p) => Monoid (DiffP p) a where
   plus = DiffP $ \_ (a, b) -> (CD.plus (a, b), \d -> ((d, d), CD.zero ()))
   {-# INLINE plus #-}
 
-  zero = DiffP $ \_ () -> (CD.zero (), \_ -> ((), CD.zero ()))
+  zero = DiffP $ \_ () -> (CD.zero (), const ((), CD.zero ()))
   {-# INLINE zero #-}
 
 ----------------------------------------------------------------------
