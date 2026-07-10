@@ -11,8 +11,9 @@
 --   * conjugate only at the boundary — composition of adjoints is free because
 --     the intermediate metrics cancel;
 --   * @g@ is a field, not a matrix — the first interesting instance is polar
---     @g = diag(1, r^2)@, so @g@ is represented as a 'Diff' and AD gives
---     @∂g@ for free when we later need Christoffel symbols.
+--     @g = diag(1, r^2)@, so @g@ is represented as a 'Diff'.  The metric's
+--     pullback carries @∂g@ in its point-slot; currently that derivative is
+--     hand-coded in each metric, with nested AD as the future honest source.
 --
 -- This module keeps the spike small: one combinator, two metric instances
 -- (Euclidean and polar), and two executable oracles.
@@ -98,6 +99,42 @@ christoffel2D lower raise x =
         gamma 1 1 1
       )
 
+-- | Directional derivative of a vector field from its AD pullback.
+--
+-- For @V : R^2 -> R^2@, the Jacobian @J_V@ is recovered from the pullback
+-- @J_V^T@ by @e_c · (J_V dx) = dx · (J_V^T e_c)@.
+directionalDerivative ::
+  Diff (Double, Double) (Double, Double) ->
+  (Double, Double) ->
+  (Double, Double) ->
+  (Double, Double)
+directionalDerivative v x dx =
+  let (_, vt) = runDiff v x
+      vTe0 = vt basis0
+      vTe1 = vt basis1
+   in (fst dx * fst vTe0 + snd dx * snd vTe0, fst dx * fst vTe1 + snd dx * snd vTe1)
+
+-- | Covariant derivative @∇_dx V@ at a point, using the metric's Christoffel
+-- symbols: @∇_dx V = ∂_dx V + Γ(x)(dx, V(x))@.
+covariantDerivative ::
+  Diff ((Double, Double), (Double, Double)) (Double, Double) ->
+  Diff ((Double, Double), (Double, Double)) (Double, Double) ->
+  Diff (Double, Double) (Double, Double) ->
+  (Double, Double) ->
+  (Double, Double) ->
+  (Double, Double)
+covariantDerivative lower raise v x dx =
+  let (vx, _) = runDiff v x
+      (g000, g001, g010, g011, g100, g101, g110, g111) = christoffel2D lower raise x
+      dx0 = fst dx
+      dx1 = snd dx
+      v0 = fst vx
+      v1 = snd vx
+      gamma0 = g000 * dx0 * v0 + g001 * dx0 * v1 + g010 * dx1 * v0 + g011 * dx1 * v1
+      gamma1 = g100 * dx0 * v0 + g101 * dx0 * v1 + g110 * dx1 * v0 + g111 * dx1 * v1
+      partial = directionalDerivative v x dx
+   in (fst partial + gamma0, snd partial + gamma1)
+
 near :: Double -> Double -> Bool
 near x y = abs (x - y) < 1e-9
 
@@ -118,8 +155,8 @@ assertV2 name (x, y) (x', y') = do
 --
 -- The metric operations are themselves 'Diff's of type @Diff (point, vector)
 -- vector@: the forward pass lowers or raises a vector at the given point.
--- We use only the forward pass for the adjoint; the fact that @g@ is a 'Diff'
--- means its derivative is available automatically when we move on to @∇@.
+-- We use only the forward pass for the adjoint; the pullback's point-slot
+-- carries the metric derivative @∂g@ that @∇@ needs.
 adjointWith ::
   -- | @g_a^-1@ — raise a covector on the domain to a vector
   Diff (a, a) a ->
@@ -256,3 +293,15 @@ runMetricAdjointTests = do
   assert "Γ^θ_{θr}" g110 (recip r)
   assert "Γ^θ_{θθ}" g111 0
   assert "symmetry Γ^θ_{rθ} = Γ^θ_{θr}" g101 g110
+
+  putStrLn "metric adjoint: covariant derivative ∇ = ∂ + Γ"
+  -- Polar basis vector e_r as a constant vector field: V(r,θ) = (1,0).
+  let eR = Diff $ const ((1, 0), const (0, 0))
+      -- ∇_θ e_r = (0, 1/r)
+      nablaThetaER = covariantDerivative lowerPolar raisePolar eR (r, theta) basis1
+  assertV2 "∇_θ e_r" nablaThetaER (0, recip r)
+
+  -- ∇_θ e_θ = (-r, 0)
+  let eTheta = Diff $ const ((0, 1), const (0, 0))
+      nablaThetaTheta = covariantDerivative lowerPolar raisePolar eTheta (r, theta) basis1
+  assertV2 "∇_θ e_θ" nablaThetaTheta (negate r, 0)
