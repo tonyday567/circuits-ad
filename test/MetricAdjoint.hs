@@ -54,7 +54,9 @@ adjointWith ::
   Diff (b, b) b ->
   -- | @J : a -> b@
   Diff a b ->
-  -- | @J* : b -> a@
+  -- | @J@ with its pullback conjugated to the @g@-adjoint.  The type is still
+  -- @Diff a b@ because the lens stores the forward map @a -> b@ and the
+  -- backward map @b -> a@; the adjoint lives in the pullback.
   Diff a b
 adjointWith raiseA lowerB (Diff f) = Diff $ \x ->
   let (y, jt) = f x
@@ -153,3 +155,18 @@ runMetricAdjointTests = do
       polarGradInCart = (fst polarGrad * fst jTe1 + snd polarGrad * snd jTe1, fst polarGrad * fst jTe2 + snd polarGrad * snd jTe2)
       (_, eucGrad) = runDiff fCart (r * cos theta, r * sin theta)
   assertV2 "polar gradient pushed to cartesian equals euclidean gradient" polarGradInCart (eucGrad 1.0)
+
+  putStrLn "metric adjoint: polar raise/lower round-trip"
+  let v = (1.5, negate 0.75)
+      (vLowered, _) = runDiff lowerPolar ((r, theta), v)
+      (vRoundTrip, _) = runDiff raisePolar ((r, theta), vLowered)
+  assertV2 "raisePolar . lowerPolar = id" vRoundTrip v
+
+  putStrLn "metric adjoint: compositionality"
+  -- fPolar = fCart . polarToCart, so the metric adjoint should satisfy
+  -- adjointWith gA gC (j2 . j1) = adjointWith gB gC j2 . adjointWith gA gB j1
+  let left = adjointWith raisePolar euclidean1D (fCart . polarToCart)
+      right = adjointWith euclidean2D euclidean1D fCart . adjointWith raisePolar euclidean2D polarToCart
+      (_, pbLeft) = runDiff left (r, theta)
+      (_, pbRight) = runDiff right (r, theta)
+  assertV2 "adjoint distributes over composition" (pbLeft 1.0) (pbRight 1.0)
