@@ -25,6 +25,79 @@ import Circuit.AD
 import NumHask.Prelude
 import Prelude ()
 
+-- | Basis vectors in R^2.
+basis0 :: (Double, Double)
+basis0 = (1, 0)
+
+basis1 :: (Double, Double)
+basis1 = (0, 1)
+
+-- | Extract the partial derivatives of the metric components from the metric's
+-- own AD pullback.  For a lower operation @c_j = g_{jk}(x) v^k@, the pullback's
+-- point-slot at @v = e_k@ and output cotangent @dc = e_j@ yields the covector
+-- @∂_i g_{jk} dx^i@.  Probing all four combinations assembles @∂g@.
+partialG ::
+  Diff ((Double, Double), (Double, Double)) (Double, Double) ->
+  (Double, Double) ->
+  -- | @∂_i g_{jk}@ indexed by @(i, j, k)@.
+  (((Double, Double), (Double, Double)), ((Double, Double), (Double, Double)))
+partialG lower x =
+  let probe v dc =
+        let (_, back) = runDiff lower (x, v)
+            (dpoint, _) = back dc
+         in dpoint
+      -- ∂_i g_{j0} for i,j = 0,1
+      row0 = (probe basis0 basis0, probe basis0 basis1)
+      -- ∂_i g_{j1} for i,j = 0,1
+      row1 = (probe basis1 basis0, probe basis1 basis1)
+   in (row0, row1)
+
+-- | Christoffel symbols @Γ^c_{ab}@ of a 2D metric, from @∂g@ and @g^{-1}@.
+--
+-- Uses the standard formula @Γ^c_{ab} = ½ g^{ci}(∂_a g_{ib} + ∂_b g_{ia} - ∂_i g_{ab})@.
+christoffel2D ::
+  Diff ((Double, Double), (Double, Double)) (Double, Double) ->
+  Diff ((Double, Double), (Double, Double)) (Double, Double) ->
+  (Double, Double) ->
+  -- | @(Γ^0_{00}, Γ^0_{01}, Γ^0_{10}, Γ^0_{11}, Γ^1_{00}, Γ^1_{01}, Γ^1_{10}, Γ^1_{11})@.
+  (Double, Double, Double, Double, Double, Double, Double, Double)
+christoffel2D lower raise x =
+  let pg = partialG lower x
+      -- g^{c i} for i = 0,1; c = 0,1
+      ((g00, g01), (g10, g11)) =
+        let (v0, _) = runDiff raise (x, basis0)
+            (v1, _) = runDiff raise (x, basis1)
+         in (v0, v1)
+      -- ∂_i g_{jk} accessor
+      d :: Int -> Int -> Int -> Double
+      d i j k = case (i, j, k) of
+        (0, 0, 0) -> fst (fst (fst pg))
+        (0, 0, 1) -> fst (snd (fst pg))
+        (0, 1, 0) -> fst (fst (snd pg))
+        (0, 1, 1) -> fst (snd (snd pg))
+        (1, 0, 0) -> snd (fst (fst pg))
+        (1, 0, 1) -> snd (snd (fst pg))
+        (1, 1, 0) -> snd (fst (snd pg))
+        (1, 1, 1) -> snd (snd (snd pg))
+        _ -> error "christoffel2D: index out of range"
+      gamma :: Int -> Int -> Int -> Double
+      gamma c a b =
+        0.5
+          * ( (if c == (0 :: Int) then g00 else g10)
+                * (d a 0 b + d b 0 a - d 0 a b)
+                + (if c == (0 :: Int) then g01 else g11)
+                * (d a 1 b + d b 1 a - d 1 a b)
+            )
+   in ( gamma 0 0 0,
+        gamma 0 0 1,
+        gamma 0 1 0,
+        gamma 0 1 1,
+        gamma 1 0 0,
+        gamma 1 0 1,
+        gamma 1 1 0,
+        gamma 1 1 1
+      )
+
 near :: Double -> Double -> Bool
 near x y = abs (x - y) < 1e-9
 
@@ -170,3 +243,16 @@ runMetricAdjointTests = do
       (_, pbLeft) = runDiff left (r, theta)
       (_, pbRight) = runDiff right (r, theta)
   assertV2 "adjoint distributes over composition" (pbLeft 1.0) (pbRight 1.0)
+
+  putStrLn "metric adjoint: Christoffel symbols from metric pullbacks"
+  let (g000, g001, g010, g011, g100, g101, g110, g111) = christoffel2D lowerPolar raisePolar (r, theta)
+  -- Polar metric: Γ^r_{θθ} = -r, Γ^θ_{rθ} = Γ^θ_{θr} = 1/r, all others zero.
+  assert "Γ^r_{rr}" g000 0
+  assert "Γ^r_{rθ}" g001 0
+  assert "Γ^r_{θr}" g010 0
+  assert "Γ^r_{θθ}" g011 (negate r)
+  assert "Γ^θ_{rr}" g100 0
+  assert "Γ^θ_{rθ}" g101 (recip r)
+  assert "Γ^θ_{θr}" g110 (recip r)
+  assert "Γ^θ_{θθ}" g111 0
+  assert "symmetry Γ^θ_{rθ} = Γ^θ_{θr}" g101 g110
