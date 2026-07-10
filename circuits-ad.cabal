@@ -53,6 +53,7 @@ test-suite verify
   main-is: Verify.hs
   other-modules:
     MatrixStar
+    MetricAdjoint
     StarEliminate
     Tags
   build-depends:

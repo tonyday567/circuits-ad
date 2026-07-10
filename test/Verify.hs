@@ -10,6 +10,7 @@ import Circuit.Monoidal (Action (..))
 import Circuit.Net (Net (..))
 import Circuit.Trace (trace)
 import MatrixStar (runMatrixStarTests)
+import MetricAdjoint (runMetricAdjointTests)
 import NumHask.Diff ()
 import NumHask.Prelude
 import StarEliminate (runStarEliminateTests)
@@ -122,3 +123,4 @@ main = do
   runMatrixStarTests
   runStarEliminateTests
   runTagTests
+  runMetricAdjointTests
