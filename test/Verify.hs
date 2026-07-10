@@ -33,7 +33,7 @@ sq :: Diff Double Double
 sq = Diff (\x -> (x * x, \d -> 2 * x * d))
 
 constD :: Double -> Diff Double Double
-constD c = Diff (\_ -> (c, const 0))
+constD c = Diff (const (c, const 0))
 
 -- | Net computing 2*x^2 via copy, parallel squares, then add.
 quadNet :: Net (,) Diff Double Double
