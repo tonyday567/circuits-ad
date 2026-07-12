@@ -361,21 +361,34 @@ projectSimplex s = s
 
 -- | Newton solve for \(f(\alpha^*; L) = 0\), Jacobian from 'jacobianAlpha'.
 --
+-- Damped steps + simplex projection after every update keep
+-- \(\alpha_b,\alpha_w \in [0,1]\) with \(\alpha_b+\alpha_w \le 0.99\).  When both
+-- daisy types are present at equilibrium the Watson–Lovelock identity
+-- \(x\cdot\beta_b = x\cdot\beta_w = \gamma\) forces a constant total coverage
+-- \(\alpha_b+\alpha_w \approx 0.673\) under the standard parameters (see the
+-- oracle harness).
+--
 -- >>> let s = newtonEq 1.0 [0.3, 0.3]
 -- >>> let res = sqrt (sum (map (\x -> x*x) (rhsD 1.0 s)))
 -- >>> res < 1e-10
 -- True
+-- >>> let [ab,aw] = s
+-- >>> ab >= 0 && aw >= 0 && ab + aw <= 1
+-- True
 newtonEq :: Double -> [Double] -> [Double]
 newtonEq l s0 =
-  let go 0 s = s
+  let go 0 s = projectSimplex s
       go n s =
         let f = rhsD l s
             j = jacobianAlpha l s
-            s' = projectSimplex (zipWith (+) s (solve2 j (map negate f)))
+            raw = solve2 j (map negate f)
+            -- damped Newton
+            delta = map (0.5 *) raw
+            s' = projectSimplex (zipWith (+) s delta)
          in if sqrt (sum (map (\x -> x * x) f)) < 1e-12
-              then s
+              then projectSimplex s
               else go (n - 1 :: Int) s'
-   in go 50 (projectSimplex s0)
+   in go 80 (projectSimplex s0)
 
 -- ---------------------------------------------------------------------------
 -- Homeostasis = pullback number
