@@ -30,6 +30,8 @@ library
   hs-source-dirs: src
   exposed-modules:
     Circuit.AD
+    Circuit.AD.Daisyworld
+    Circuit.AD.DubinsChase
     Circuit.AD.Eliminate
     Circuit.AD.Matrix
     Circuit.AD.Melt
@@ -53,8 +55,17 @@ test-suite verify
   hs-source-dirs: test
   main-is: Verify.hs
   other-modules:
+    Capstone
+    Daisyworld
+    DubinsChase
+    GeodesicSpike
+    JacobiSpike
     MatrixStar
     MetricAdjoint
+    MetricGamma
+    NestedSmoke
+    RiemannAD
+    RiemannSpike
     StarEliminate
     Tags
   build-depends:

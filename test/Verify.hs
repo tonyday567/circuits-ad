@@ -2,6 +2,7 @@
 
 module Main (main) where
 
+import Capstone (runCapstone)
 import Circuit (Trace, run)
 import Circuit qualified
 import Circuit.AD
@@ -9,10 +10,18 @@ import Circuit.AD.Pullback (evalPullback)
 import Circuit.Monoidal (Action (..))
 import Circuit.Net (Net (..))
 import Circuit.Trace (trace)
+import Daisyworld (runDaisyworld)
+import DubinsChase (runDubinsChase)
+import GeodesicSpike (runGeodesicSpike)
+import JacobiSpike (runJacobiSpike)
 import MatrixStar (runMatrixStarTests)
 import MetricAdjoint (runMetricAdjointTests)
+import MetricGamma (runMetricGamma)
+import NestedSmoke (runNestedSmoke)
 import NumHask.Diff ()
 import NumHask.Prelude
+import RiemannAD (runRiemannAD)
+import RiemannSpike (runRiemannSpike)
 import StarEliminate (runStarEliminateTests)
 import System.Exit (exitFailure)
 import Tags (runTagTests)
@@ -124,3 +133,12 @@ main = do
   runStarEliminateTests
   runTagTests
   runMetricAdjointTests
+  runGeodesicSpike
+  runRiemannSpike
+  runNestedSmoke
+  runMetricGamma
+  runRiemannAD
+  runJacobiSpike
+  runCapstone
+  runDaisyworld
+  runDubinsChase
