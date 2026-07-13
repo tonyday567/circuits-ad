@@ -2,6 +2,7 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -539,6 +540,14 @@ instance Tensor (,) (Diff' p) where
     let (b, fb) = f a; (d, gd) = g c
      in ((b, d), Data.Bifunctor.bimap fb gd)
   {-# INLINE par #-}
+  unitl = Diff (\((), a) -> (a, ((),)))
+  {-# INLINE unitl #-}
+  unitl' = Diff (\a -> (((), a), \((), da) -> da))
+  {-# INLINE unitl' #-}
+  unitr = Diff (\(a, ()) -> (a, (,())))
+  {-# INLINE unitr #-}
+  unitr' = Diff (\a -> ((a, ()), \(da, ()) -> da))
+  {-# INLINE unitr' #-}
 
 instance Action (,) (Diff' p) where
   swap = Diff (\(a, b) -> ((b, a), \(db, da) -> (da, db)))

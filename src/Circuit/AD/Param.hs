@@ -183,6 +183,14 @@ instance (Monoid (->) p) => Tensor (,) (DiffP p) where
              in ((da, dc), CD.plus (dpF, dpG))
         )
   {-# INLINE par #-}
+  unitl = DiffP $ \_ ((), a) -> (a, \da -> (((), da), CD.zero ()))
+  {-# INLINE unitl #-}
+  unitl' = DiffP $ \_ a -> (((), a), \((), da) -> (da, CD.zero ()))
+  {-# INLINE unitl' #-}
+  unitr = DiffP $ \_ (a, ()) -> (a, \da -> ((da, ()), CD.zero ()))
+  {-# INLINE unitr #-}
+  unitr' = DiffP $ \_ a -> ((a, ()), \(da, ()) -> (da, CD.zero ()))
+  {-# INLINE unitr' #-}
 
 instance (Monoid (->) p) => Action (,) (DiffP p) where
   swap = DiffP $ \_ (a, b) -> ((b, a), \(db, da) -> ((da, db), CD.zero ()))

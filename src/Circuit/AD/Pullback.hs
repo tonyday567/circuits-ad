@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -- | Linear cotangent maps — the base arrow for reverse-mode gradients.
@@ -69,6 +70,14 @@ instance Category Pullback where
 instance Tensor (,) Pullback where
   par (Pullback f) (Pullback g) = Pullback (Data.Bifunctor.bimap f g)
   {-# INLINE par #-}
+  unitl = Pullback snd
+  {-# INLINE unitl #-}
+  unitl' = Pullback ((),)
+  {-# INLINE unitl' #-}
+  unitr = Pullback fst
+  {-# INLINE unitr #-}
+  unitr' = Pullback (,())
+  {-# INLINE unitr' #-}
 
 instance Action (,) Pullback where
   swap = Pullback (\(b, a) -> (a, b))
