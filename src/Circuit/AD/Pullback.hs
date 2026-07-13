@@ -26,7 +26,7 @@ where
 
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Layer (run)
-import Circuit.Monoidal (Action (..))
+import Circuit.Monoidal (Action (..), Tensor (..))
 import Circuit.Monoidal.Category (Monoidal (..))
 import Circuit.Net (Net)
 import Circuit.Trace (Traced (..))
@@ -36,7 +36,7 @@ import Prelude hiding (Monoid, id, (.))
 
 -- $setup
 -- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
--- >>> import Circuit.Monoidal (Action (..))
+-- >>> import Circuit.Monoidal (Action (..), Tensor (..))
 -- >>> import Circuit.Monoidal.Category (Monoidal (..))
 -- >>> import Circuit.Net (Net (..))
 -- >>> import Circuit.Trace (Traced (..))
@@ -66,10 +66,11 @@ instance Category Pullback where
 -- >>> let g = Pullback (*2) :: Pullback Int Int
 -- >>> runPullback (par f g) (3, 4)
 -- (4,8)
-instance Action (,) Pullback where
+instance Tensor (,) Pullback where
   par (Pullback f) (Pullback g) = Pullback (Data.Bifunctor.bimap f g)
   {-# INLINE par #-}
 
+instance Action (,) Pullback where
   swap = Pullback (\(b, a) -> (a, b))
   {-# INLINE swap #-}
 

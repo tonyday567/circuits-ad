@@ -65,7 +65,7 @@ where
 import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
-import Circuit.Monoidal (Action (..))
+import Circuit.Monoidal (Action (..), Tensor (..))
 import Circuit.Monoidal.Category (Monoidal (..))
 import Circuit.Net (Net (..))
 import Circuit.Net qualified
@@ -534,12 +534,13 @@ instance (Monoid (->) a) => Monoid (Diff' p) a where
 -- (4,8)
 -- >>> pb (1, 1)
 -- (1,2)
-instance Action (,) (Diff' p) where
+instance Tensor (,) (Diff' p) where
   par (Diff f) (Diff g) = Diff $ \(a, c) ->
     let (b, fb) = f a; (d, gd) = g c
      in ((b, d), Data.Bifunctor.bimap fb gd)
   {-# INLINE par #-}
 
+instance Action (,) (Diff' p) where
   swap = Diff (\(a, b) -> ((b, a), \(db, da) -> (da, db)))
   {-# INLINE swap #-}
 

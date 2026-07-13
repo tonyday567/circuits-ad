@@ -41,7 +41,7 @@ where
 
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
-import Circuit.Monoidal (Action (..))
+import Circuit.Monoidal (Action (..), Tensor (..))
 import Circuit.Monoidal.Category (Monoidal (..))
 import Control.Category
 import Data.Bifunctor
@@ -51,7 +51,7 @@ import Prelude hiding (Monoid, id, (.))
 -- $setup
 -- >>> import Circuit.AD.Param
 -- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
--- >>> import Circuit.Monoidal (Action (..))
+-- >>> import Circuit.Monoidal (Action (..), Tensor (..))
 -- >>> import Control.Category
 -- >>> import NumHask.Diff (Diff' (..), Diff, runDiff)
 -- >>> import Prelude hiding (id, (.))
@@ -172,7 +172,7 @@ instance (Monoid (->) p) => Monoidal (,) (DiffP p) where
 -- (4,8)
 -- >>> pb (1, 1)
 -- ((1,2),())
-instance (Monoid (->) p) => Action (,) (DiffP p) where
+instance (Monoid (->) p) => Tensor (,) (DiffP p) where
   par (DiffP f) (DiffP g) = DiffP $ \p (a, c) ->
     let (b, fBack) = f p a
         (d, gBack) = g p c
@@ -184,6 +184,7 @@ instance (Monoid (->) p) => Action (,) (DiffP p) where
         )
   {-# INLINE par #-}
 
+instance (Monoid (->) p) => Action (,) (DiffP p) where
   swap = DiffP $ \_ (a, b) -> ((b, a), \(db, da) -> ((da, db), CD.zero ()))
   {-# INLINE swap #-}
 
