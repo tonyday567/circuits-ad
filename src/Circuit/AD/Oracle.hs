@@ -36,14 +36,14 @@ where
 
 import Circuit (Trace (..), run)
 import Circuit.AD (Diff, Diff', traceNFrom, pattern Diff)
-import Control.Category ((>>>))
+import Circuit.Classes ((>>>))
 import Numeric.AD.DelCont (rad1)
 import Prelude hiding (id, (.))
 
 -- $setup
 -- >>> 1 + 1 :: Int
 -- 2
--- >>> import Control.Category ((>>>))
+-- >>> import Circuit.Classes ((>>>))
 -- >>> import Trace (Trace(..), run)
 -- >>> import Circuit.AD (Diff, Diff' (..), pattern Diff, traceNFrom)
 -- >>> import Numeric.AD.DelCont (rad1)

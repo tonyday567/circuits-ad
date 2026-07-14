@@ -64,6 +64,7 @@ module Circuit.AD
 where
 
 import Circuit.AD.Pullback (Pullback (..))
+import Circuit.Classes (Category (..), Discrete (..))
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
 import Circuit.Monoidal (Action (..), Tensor (..))
@@ -72,7 +73,6 @@ import Circuit.Net (Net (..))
 import Circuit.Net qualified
 import Circuit.Trace (Traced (..))
 import Circuit.Trace qualified as C
-import Control.Category
 import Data.Bifunctor
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
@@ -81,8 +81,27 @@ import NumHask.Diff (Diff, Diff', runDiff, pattern Diff)
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
+-- >>> import Circuit.Classes (Category (..))
 -- >>> import Circuit.Trace (Trace (..), run)
 -- >>> import Prelude hiding (id, (.))
+
+-- | 'Circuit.Classes.Category' for 'Diff''.
+--
+-- 'NumHask.Diff' still provides 'Control.Category'; circuits needs the local
+-- 'Category' with associated 'Ob' (default @()@) so 'Monoidal' / 'Traced' /
+-- free 'Trace' folds typecheck after kind-gen.
+instance Category (Diff' p) where
+  id = Diff (\a -> (a, \da -> da))
+  Diff f . Diff g = Diff $ \a ->
+    let (b, gb) = g a
+        (c, fc) = f b
+     in (c, \dc -> gb (fc dc))
+  {-# INLINE id #-}
+  {-# INLINE (.) #-}
+
+-- | Unconstrained objects — every type is an object of 'Diff''.
+instance Discrete (Diff' p) where
+  withOb x = x
 
 -- | 'Trace' for 'Diff' with the @(,)@ tensor.
 --

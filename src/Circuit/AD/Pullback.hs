@@ -25,17 +25,18 @@ module Circuit.AD.Pullback
   )
 where
 
+import Circuit.Classes (Category (..), Discrete (..))
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Layer (run)
 import Circuit.Monoidal (Action (..), Tensor (..))
 import Circuit.Monoidal.Category (Monoidal (..))
 import Circuit.Net (Net)
 import Circuit.Trace (Traced (..))
-import Control.Category
 import Data.Bifunctor
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
+-- >>> import Circuit.Classes (Category (..))
 -- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
 -- >>> import Circuit.Monoidal (Action (..), Tensor (..))
 -- >>> import Circuit.Monoidal.Category (Monoidal (..))
@@ -55,10 +56,14 @@ newtype Pullback b a = Pullback
   }
 
 instance Category Pullback where
-  id = Pullback id
-  Pullback g . Pullback f = Pullback (g . f)
+  id = Pullback (\x -> x)
+  Pullback g . Pullback f = Pullback (\x -> g (f x))
   {-# INLINE id #-}
   {-# INLINE (.) #-}
+
+-- | Unconstrained objects — every type is an object of 'Pullback'.
+instance Discrete Pullback where
+  withOb x = x
 
 -- | Parallel composition pairs pullbacks independently; 'swap' swaps
 -- the two cotangents.

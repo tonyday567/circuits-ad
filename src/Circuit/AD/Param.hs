@@ -39,20 +39,20 @@ module Circuit.AD.Param
   )
 where
 
+import Circuit.Classes (Category (..), Discrete (..))
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
 import Circuit.Monoidal (Action (..), Tensor (..))
 import Circuit.Monoidal.Category (Monoidal (..))
-import Control.Category
 import Data.Bifunctor
 import NumHask.Diff (Diff', runDiff, pattern Diff)
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
 -- >>> import Circuit.AD.Param
+-- >>> import Circuit.Classes (Category (..))
 -- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
 -- >>> import Circuit.Monoidal (Action (..), Tensor (..))
--- >>> import Control.Category
 -- >>> import NumHask.Diff (Diff' (..), Diff, runDiff)
 -- >>> import Prelude hiding (id, (.))
 
@@ -134,6 +134,10 @@ instance (Monoid (->) p) => Category (DiffP p) where
              in (da, CD.plus (dpF, dpG))
         )
   {-# INLINE (.) #-}
+
+-- | Unconstrained objects — 'DiffP' carries no 'Ob' restriction.
+instance (Monoid (->) p) => Discrete (DiffP p) where
+  withOb x = x
 
 ----------------------------------------------------------------------
 -- Monoidal structure on objects
