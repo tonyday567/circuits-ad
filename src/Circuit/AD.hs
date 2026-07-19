@@ -67,8 +67,8 @@ import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Classes (Category (..), Discrete (..))
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
-import Circuit.Monoidal (Action (..), Tensor (..))
-import Circuit.Monoidal.Category (Monoidal (..))
+import Circuit.Monoidal (Monoidal (..))
+import Circuit.Tensor (Action (..), Tensor (..))
 import Circuit.Net (Net (..))
 import Circuit.Net qualified
 import Circuit.Trace (Traced (..))
@@ -521,7 +521,7 @@ linearizeCircuit (C.Knot f) a =
 
 -- | Copy in D: the pullback is 'plus' (fan-in on the backward pass).
 --
--- >>> import Circuit.Monoidal (Action(..))
+-- >>> import Circuit.Tensor (Action(..))
 -- >>> import Circuit.Dagger (Comonoid(..))
 -- >>> let (_, pb) = runDiff (dup :: Diff Int (Int, Int)) 5
 -- >>> pb (1, 2)

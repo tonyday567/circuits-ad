@@ -42,8 +42,8 @@ where
 import Circuit.Classes (Category (..), Discrete (..))
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
-import Circuit.Monoidal (Action (..), Tensor (..))
-import Circuit.Monoidal.Category (Monoidal (..))
+import Circuit.Monoidal (Monoidal (..))
+import Circuit.Tensor (Action (..), Tensor (..))
 import Data.Bifunctor
 import NumHask.Diff (Diff', runDiff, pattern Diff)
 import Prelude hiding (Monoid, id, (.))
@@ -52,7 +52,7 @@ import Prelude hiding (Monoid, id, (.))
 -- >>> import Circuit.AD.Param
 -- >>> import Circuit.Classes (Category (..))
 -- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
--- >>> import Circuit.Monoidal (Action (..), Tensor (..))
+-- >>> import Circuit.Tensor (Action (..), Tensor (..))
 -- >>> import NumHask.Diff (Diff' (..), Diff, runDiff)
 -- >>> import Prelude hiding (id, (.))
 

@@ -6,7 +6,7 @@ import Circuit (Trace, run)
 import Circuit qualified
 import Circuit.AD
 import Circuit.AD.Pullback (evalPullback)
-import Circuit.Monoidal (Action (..))
+import Circuit.Tensor (Action (..))
 import Circuit.Net (Net (..))
 import Circuit.Trace (trace)
 import MatrixStar (runMatrixStarTests)
