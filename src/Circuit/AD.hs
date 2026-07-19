@@ -64,7 +64,7 @@ module Circuit.AD
 where
 
 import Circuit.AD.Pullback (Pullback (..))
-import Circuit.Classes (Category (..), Discrete (..))
+import Circuit.Category (Category (..), Discrete (..))
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
 import Circuit.Monoidal (Monoidal (..))
@@ -81,11 +81,11 @@ import NumHask.Diff (Diff, Diff', runDiff, pattern Diff)
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
--- >>> import Circuit.Classes (Category (..))
+-- >>> import Circuit.Category (Category (..))
 -- >>> import Circuit.Trace (Trace (..), run)
 -- >>> import Prelude hiding (id, (.))
 
--- | 'Circuit.Classes.Category' for 'Diff''.
+-- | 'Circuit.Category.Category' for 'Diff''.
 --
 -- 'NumHask.Diff' still provides 'Control.Category'; circuits needs the local
 -- 'Category' with associated 'Ob' (default @()@) so 'Monoidal' / 'Traced' /

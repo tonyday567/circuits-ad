@@ -25,7 +25,7 @@ module Circuit.AD.Pullback
   )
 where
 
-import Circuit.Classes (Category (..), Discrete (..))
+import Circuit.Category (Category (..), Discrete (..))
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Layer (run)
 import Circuit.Monoidal (Monoidal (..))
@@ -36,7 +36,7 @@ import Data.Bifunctor
 import Prelude hiding (Monoid, id, (.))
 
 -- $setup
--- >>> import Circuit.Classes (Category (..))
+-- >>> import Circuit.Category (Category (..))
 -- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
 -- >>> import Circuit.Monoidal (Monoidal (..))
 -- >>> import Circuit.Tensor (Action (..), Tensor (..))

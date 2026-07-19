@@ -39,7 +39,7 @@ module Circuit.AD.Param
   )
 where
 
-import Circuit.Classes (Category (..), Discrete (..))
+import Circuit.Category (Category (..), Discrete (..))
 import Circuit.Dagger (Comonoid (..), Monoid (..))
 import Circuit.Dagger qualified as CD
 import Circuit.Monoidal (Monoidal (..))
@@ -50,7 +50,7 @@ import Prelude hiding (Monoid, id, (.))
 
 -- $setup
 -- >>> import Circuit.AD.Param
--- >>> import Circuit.Classes (Category (..))
+-- >>> import Circuit.Category (Category (..))
 -- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
 -- >>> import Circuit.Tensor (Action (..), Tensor (..))
 -- >>> import NumHask.Diff (Diff' (..), Diff, runDiff)
