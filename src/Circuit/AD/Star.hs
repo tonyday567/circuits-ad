@@ -35,13 +35,13 @@ where
 
 import Circuit.AD (Diff, Diff', traceStarFrom, pattern Diff)
 import Circuit.AD.Matrix (Matrix (..), matVec, starMatrix)
-import Circuit.Dagger (Monoid)
+import Circuit.Dagger (MergeZero (..))
 import Circuit.Dagger qualified as CD
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR
 import NumHask.Free.Carriers (FieldStar (..))
-import Prelude hiding (Monoid, id, (.))
+import Prelude hiding (id, (.))
 
 -- $setup
 -- >>> import Circuit.AD (Diff (..))
@@ -66,7 +66,7 @@ import Prelude hiding (Monoid, id, (.))
 -- __Proof obligation__: probing assumes every primitive's pullback is
 -- a genuinely linear map — true for honestly-constructed 'Diff' prims.
 traceStarMatrix ::
-  (NHR.StarSemiring j, Monoid (->) c) =>
+  (NHR.StarSemiring j, MergeZero (->) c) =>
   -- | forward seed; its length is the channel dimension
   [j] ->
   -- | forward iteration count
@@ -112,7 +112,7 @@ traceStarMatrix x0 n (Diff body) = Diff $ \b ->
 -- >>> abs (pb 1.0 - 2.0 / 0.7) < 1e-12
 -- True
 traceStarFromD ::
-  (Monoid (->) c) =>
+  (MergeZero (->) c) =>
   Double ->
   Int ->
   Diff' p (Double, b) (Double, c) ->
@@ -147,7 +147,7 @@ traceStarFromD x0 n (Diff body) =
 -- >>> abs (pb2 1.0 - 1.6 / 0.85) < 1e-12
 -- True
 traceStarMatrixD ::
-  (Monoid (->) c) =>
+  (MergeZero (->) c) =>
   [Double] ->
   Int ->
   Diff' p ([Double], b) ([Double], c) ->

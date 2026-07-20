@@ -26,22 +26,20 @@ module Circuit.AD.Pullback
 where
 
 import Circuit.Category (Category (..), Discrete (..))
-import Circuit.Dagger (Comonoid (..), Monoid (..))
+import Circuit.Channel (Channel (..), Strength (..), Traced (..))
+import Circuit.Dagger (CopyDiscard (..), MergeZero (..))
 import Circuit.Layer (run)
-import Circuit.Monoidal (Monoidal (..))
 import Circuit.Tensor (Action (..), Tensor (..))
 import Circuit.Net (Net)
-import Circuit.Trace (Traced (..))
 import Data.Bifunctor
-import Prelude hiding (Monoid, id, (.))
+import Prelude hiding (id, (.))
 
 -- $setup
 -- >>> import Circuit.Category (Category (..))
--- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
--- >>> import Circuit.Monoidal (Monoidal (..))
+-- >>> import Circuit.Dagger (CopyDiscard (..), MergeZero (..))
+-- >>> import Circuit.Channel (Channel (..), Strength (..), Traced (..))
 -- >>> import Circuit.Tensor (Action (..), Tensor (..))
 -- >>> import Circuit.Net (Net (..))
--- >>> import Circuit.Trace (Traced (..))
 -- >>> import Prelude hiding (id, (.))
 
 -- | A linear map from output cotangents to input cotangents, read as
@@ -88,6 +86,10 @@ instance Action (,) Pullback where
   swap = Pullback (\(b, a) -> (a, b))
   {-# INLINE swap #-}
 
+instance Strength (,) Pullback where
+  strength (Pullback f) = Pullback (\(a, b) -> (a, f b))
+  {-# INLINE strength #-}
+
 -- | The cartesian trace for pullbacks.
 --
 -- The body is a linear map @f :: (x, c) -> (x, b)@.  The traced
@@ -114,9 +116,6 @@ instance Traced (,) Pullback where
      in db
   {-# INLINE trace #-}
 
-  untrace (Pullback g) = Pullback $ Data.Bifunctor.second g
-  {-# INLINE untrace #-}
-
 -- | Pullback-instance of the comonoid structure.
 --
 -- Copy's pullback is addition; discard's pullback is the zero
@@ -135,7 +134,7 @@ instance Traced (,) Pullback where
 -- permits, drop the constraint; keeping a stray @Additive@ here reads
 -- as \"addition happens in this instance\", which is exactly the
 -- confusion the paragraph above tries to dispel.
-instance Comonoid Pullback a where
+instance CopyDiscard Pullback a where
   copy = Pullback (\b -> (b, b))
   {-# INLINE copy #-}
 
@@ -150,7 +149,7 @@ instance Comonoid Pullback a where
 -- 3
 -- >>> runPullback (zero :: Pullback () Int) ()
 -- 0
-instance (Monoid (->) a) => Monoid Pullback a where
+instance (MergeZero (->) a) => MergeZero Pullback a where
   plus = Pullback (\(b1, b2) -> plus (b1, b2))
   {-# INLINE plus #-}
 
@@ -167,7 +166,7 @@ evalPullback n = runPullback (run n)
 {-# INLINE evalPullback #-}
 
 -- | Cartesian channel plumbing for pullbacks.
-instance Monoidal (,) Pullback where
+instance Channel (,) Pullback where
   assoc = Pullback (\((s, s'), x) -> (s, (s', x)))
   assoc' = Pullback (\(s, (s', x)) -> ((s, s'), x))
-  braid = Pullback (\(s, (s', x)) -> (s', (s, x)))
+  slide = Pullback (\(s, (s', x)) -> (s', (s, x)))

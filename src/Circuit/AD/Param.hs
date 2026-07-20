@@ -40,18 +40,18 @@ module Circuit.AD.Param
 where
 
 import Circuit.Category (Category (..), Discrete (..))
-import Circuit.Dagger (Comonoid (..), Monoid (..))
+import Circuit.Channel (Channel (..))
+import Circuit.Dagger (CopyDiscard (..), MergeZero (..))
 import Circuit.Dagger qualified as CD
-import Circuit.Monoidal (Monoidal (..))
 import Circuit.Tensor (Action (..), Tensor (..))
 import Data.Bifunctor
 import NumHask.Diff (Diff', runDiff, pattern Diff)
-import Prelude hiding (Monoid, id, (.))
+import Prelude hiding (id, (.))
 
 -- $setup
 -- >>> import Circuit.AD.Param
 -- >>> import Circuit.Category (Category (..))
--- >>> import Circuit.Dagger (Comonoid (..), Monoid (..))
+-- >>> import Circuit.Dagger (CopyDiscard (..), MergeZero (..))
 -- >>> import Circuit.Tensor (Action (..), Tensor (..))
 -- >>> import NumHask.Diff (Diff' (..), Diff, runDiff)
 -- >>> import Prelude hiding (id, (.))
@@ -98,7 +98,7 @@ toPrim (DiffP f) = TensorPrim (\p a -> fst (f p a)) (\p a db -> snd (f p a) db)
 -- @p@.
 --
 -- Identity returns a zero parameter gradient.  This instance needs
--- @Monoid (->) p@ because the parameter type must supply both @zero@ (for
+-- @MergeZero (->) p@ because the parameter type must supply both @zero@ (for
 -- 'id') and @plus@ (for composing gradients).
 --
 -- >>> let inc = DiffP (\() x -> (x + 1, \dy -> (dy, ()))) :: DiffP () Int Int
@@ -120,7 +120,7 @@ toPrim (DiffP f) = TensorPrim (\p a -> fst (f p a)) (\p a db -> snd (f p a) db)
 -- 26
 -- >>> pb 1
 -- (2,3)
-instance (Monoid (->) p) => Category (DiffP p) where
+instance (MergeZero (->) p) => Category (DiffP p) where
   id = DiffP $ \_ a -> (a, (,CD.zero ()))
   {-# INLINE id #-}
 
@@ -136,7 +136,7 @@ instance (Monoid (->) p) => Category (DiffP p) where
   {-# INLINE (.) #-}
 
 -- | Unconstrained objects — 'DiffP' carries no 'Ob' restriction.
-instance (Monoid (->) p) => Discrete (DiffP p) where
+instance (MergeZero (->) p) => Discrete (DiffP p) where
   withOb x = x
 
 ----------------------------------------------------------------------
@@ -145,18 +145,18 @@ instance (Monoid (->) p) => Discrete (DiffP p) where
 
 -- | Structural associator for nested pairs.  No parameters are touched.
 --
--- The superclass 'Category (DiffP p)' requires 'Monoid (->) p', so the
+-- The superclass 'Category (DiffP p)' requires 'MergeZero (->) p', so the
 -- instance carries the same constraint even though the structural maps
 -- themselves ignore the parameter.
-instance (Monoid (->) p) => Monoidal (,) (DiffP p) where
+instance (MergeZero (->) p) => Channel (,) (DiffP p) where
   assoc = DiffP $ \_ ((a, b), c) -> ((a, (b, c)), \(da, (db, dc)) -> (((da, db), dc), CD.zero ()))
   {-# INLINE assoc #-}
 
   assoc' = DiffP $ \_ (a, (b, c)) -> (((a, b), c), \((da, db), dc) -> ((da, (db, dc)), CD.zero ()))
   {-# INLINE assoc' #-}
 
-  braid = DiffP $ \_ (a, (b, c)) -> ((b, (a, c)), \(db, (da, dc)) -> ((da, (db, dc)), CD.zero ()))
-  {-# INLINE braid #-}
+  slide = DiffP $ \_ (a, (b, c)) -> ((b, (a, c)), \(db, (da, dc)) -> ((da, (db, dc)), CD.zero ()))
+  {-# INLINE slide #-}
 
 ----------------------------------------------------------------------
 -- Monoidal product of morphisms
@@ -176,7 +176,7 @@ instance (Monoid (->) p) => Monoidal (,) (DiffP p) where
 -- (4,8)
 -- >>> pb (1, 1)
 -- ((1,2),())
-instance (Monoid (->) p) => Tensor (,) (DiffP p) where
+instance (MergeZero (->) p) => Tensor (,) (DiffP p) where
   par (DiffP f) (DiffP g) = DiffP $ \p (a, c) ->
     let (b, fBack) = f p a
         (d, gBack) = g p c
@@ -196,7 +196,7 @@ instance (Monoid (->) p) => Tensor (,) (DiffP p) where
   unitr' = DiffP $ \_ a -> ((a, ()), \(da, ()) -> (da, CD.zero ()))
   {-# INLINE unitr' #-}
 
-instance (Monoid (->) p) => Action (,) (DiffP p) where
+instance (MergeZero (->) p) => Action (,) (DiffP p) where
   swap = DiffP $ \_ (a, b) -> ((b, a), \(db, da) -> ((da, db), CD.zero ()))
   {-# INLINE swap #-}
 
@@ -210,7 +210,7 @@ instance (Monoid (->) p) => Action (,) (DiffP p) where
 -- >>> let (_, pb) = runDiffP copy () (5 :: Int)
 -- >>> pb (1, 2)
 -- (3,())
-instance (Monoid (->) a, Monoid (->) p) => Comonoid (DiffP p) a where
+instance (MergeZero (->) a, MergeZero (->) p) => CopyDiscard (DiffP p) a where
   copy = DiffP $ \_ a -> ((a, a), \(da1, da2) -> (CD.plus (da1, da2), CD.zero ()))
   {-# INLINE copy #-}
 
@@ -223,7 +223,7 @@ instance (Monoid (->) a, Monoid (->) p) => Comonoid (DiffP p) a where
 -- >>> let (_, pb) = runDiffP plus () ((3, 4) :: (Int, Int))
 -- >>> pb 1
 -- ((1,1),())
-instance (Monoid (->) a, Monoid (->) p) => Monoid (DiffP p) a where
+instance (MergeZero (->) a, MergeZero (->) p) => MergeZero (DiffP p) a where
   plus = DiffP $ \_ (a, b) -> (CD.plus (a, b), \d -> ((d, d), CD.zero ()))
   {-# INLINE plus #-}
 
@@ -238,7 +238,7 @@ instance (Monoid (->) a, Monoid (->) p) => Monoid (DiffP p) a where
 --
 --   forward:  y = x + op(x)
 --   backward: dx = dy + dOp
-residual :: (Num a, Monoid (->) p) => DiffP p a a -> DiffP p a a
+residual :: (Num a, MergeZero (->) p) => DiffP p a a -> DiffP p a a
 residual op = DiffP $ \p a ->
   let (b, opBack) = runDiffP op p a
    in ( a + b,

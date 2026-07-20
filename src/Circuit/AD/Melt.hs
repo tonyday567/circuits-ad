@@ -18,9 +18,9 @@ module Circuit.AD.Melt
 where
 
 import Circuit.AD.Pullback (Pullback (..))
-import Circuit.Dagger (Comonoid (..), Monoid (..))
+import Circuit.Dagger (CopyDiscard (..), MergeZero (..))
 import Circuit.Net (Net (..))
-import Prelude hiding (Monoid, id, (.))
+import Prelude hiding (id, (.))
 
 -- | Replace every structural row with its pure 'Pullback' interpretation.
 --

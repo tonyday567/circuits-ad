@@ -133,7 +133,7 @@ instance
 -- 'Circuit.AD.linearizeNet' never need this — their structural rows are
 -- already 'Lift's.)  Deliberately orphan: this module is the federation
 -- seam between @circuits@ and @numhask-free@.
-instance Circuit.Dagger.Monoid (->) FieldStar where
+instance Circuit.Dagger.MergeZero (->) FieldStar where
   plus (FieldStar x, FieldStar y) = FieldStar (x P.+ y)
   zero _ = FieldStar 0
 

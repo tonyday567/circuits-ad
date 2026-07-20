@@ -2,13 +2,13 @@
 
 module Main (main) where
 
-import Circuit (Trace, run)
+import Circuit (Loop, run)
 import Circuit qualified
 import Circuit.AD
 import Circuit.AD.Pullback (evalPullback)
 import Circuit.Tensor (Action (..))
 import Circuit.Net (Net (..))
-import Circuit.Trace (trace)
+import Circuit.Channel (Traced (..))
 import MatrixStar (runMatrixStarTests)
 import MetricAdjoint (runMetricAdjointTests)
 import NumHask.Diff ()
@@ -59,7 +59,7 @@ main = do
   assert "gradient" (pbLoop 1.0) (1.0 / (1.0 - 0.3) * 2.0 + 1.0)
 
   putStrLn "direct primitive via run"
-  let (yPrim, pbPrim) = runDiff (run (Circuit.Arr sq :: Trace (,) Diff Double Double)) 3.0
+  let (yPrim, pbPrim) = runDiff (run (Circuit.Lift sq :: Loop (,) Diff Double Double)) 3.0
   assert "value" yPrim 9.0
   assert "gradient" (pbPrim 1.0) 6.0
 

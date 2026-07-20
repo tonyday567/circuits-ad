@@ -34,17 +34,17 @@ module Circuit.AD.Oracle
   )
 where
 
-import Circuit (Trace (..), run)
+import Circuit (Loop (..), run)
 import Circuit.AD (Diff, Diff', traceNFrom, pattern Diff)
-import Circuit.Category ((>>>))
+import Circuit.Category ((.>))
 import Numeric.AD.DelCont (rad1)
 import Prelude hiding (id, (.))
 
 -- $setup
 -- >>> 1 + 1 :: Int
 -- 2
--- >>> import Circuit.Category ((>>>))
--- >>> import Trace (Trace(..), run)
+-- >>> import Circuit.Category ((.>))
+-- >>> import Circuit.Loop (Loop (..), run)
 -- >>> import Circuit.AD (Diff, Diff' (..), pattern Diff, traceNFrom)
 -- >>> import Numeric.AD.DelCont (rad1)
 -- >>> import Prelude hiding (id, (.))
@@ -65,15 +65,15 @@ sinSqr x = sin (x * x)
 -- Test 1: Primitive agreement — run @Diff vs rad1
 -- ===========================================================================
 
--- | @x²@ as a Trace Diff.
-sqrCircuit :: Trace (,) Diff Double Double
-sqrCircuit = Arr (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
+-- | @x²@ as a Loop Diff.
+sqrCircuit :: Loop (,) Diff Double Double
+sqrCircuit = Lift (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
 
 -- | @sin(x²)@ as two composed Lift Diffs.
-sinSqrCircuit :: Trace (,) Diff Double Double
+sinSqrCircuit :: Loop (,) Diff Double Double
 sinSqrCircuit =
-  Arr (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
-    >>> Arr (Diff (\x -> (sin x, \dx -> cos x * dx)))
+  Lift (Diff (\x -> (x * x, \dx -> 2 * x * dx)))
+    .> Lift (Diff (\x -> (sin x, \dx -> cos x * dx)))
 
 -- | Derivative of @x²@ agrees: @run @Diff@ vs @rad1@.
 --
@@ -93,7 +93,7 @@ sinSqrCircuit =
 
 -- | The triangle holds on a simple Diff circuit.
 --
--- >>> import Trace (encode, lower)
+-- >>> import Circuit (encode, lower)
 -- >>> let circuit = sqrCircuit
 -- >>> let (yr, pb) = runDiff (run circuit) 3.0
 -- >>> let (ye, pbe) = lower (encode circuit) 3.0
@@ -102,7 +102,7 @@ sinSqrCircuit =
 
 -- | The triangle holds on a composed Diff circuit.
 --
--- >>> import Trace (encode, lower)
+-- >>> import Circuit (encode, lower)
 -- >>> let circuit = sinSqrCircuit
 -- >>> let test x = let (yr, pb) = runDiff (run circuit) x; (ye, pbe) = lower (encode circuit) x in abs (yr - ye) < 1e-10 && abs (pb 1.0 - pbe 1.0) < 1e-10
 -- >>> all test [0.1, 0.5, 1.0, 2.0]

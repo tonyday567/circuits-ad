@@ -65,24 +65,24 @@ where
 
 import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Category (Category (..), Discrete (..))
-import Circuit.Dagger (Comonoid (..), Monoid (..))
+import Circuit.Channel (Channel (..), Strength (..), Traced (..))
+import Circuit.Channel qualified as Channel
+import Circuit.Dagger (CopyDiscard (..), MergeZero (..))
 import Circuit.Dagger qualified as CD
-import Circuit.Monoidal (Monoidal (..))
+import Circuit.Loop qualified as C
 import Circuit.Tensor (Action (..), Tensor (..))
 import Circuit.Net (Net (..))
 import Circuit.Net qualified
-import Circuit.Trace (Traced (..))
-import Circuit.Trace qualified as C
 import Data.Bifunctor
 import NumHask.Algebra.Additive qualified as NHA
 import NumHask.Algebra.Multiplicative qualified as NHM
 import NumHask.Algebra.Ring qualified as NHR
 import NumHask.Diff (Diff, Diff', runDiff, pattern Diff)
-import Prelude hiding (Monoid, id, (.))
+import Prelude hiding (id, (.))
 
 -- $setup
 -- >>> import Circuit.Category (Category (..))
--- >>> import Circuit.Trace (Trace (..), run)
+-- >>> import Circuit.Loop (Loop (..), run)
 -- >>> import Prelude hiding (id, (.))
 
 -- | 'Circuit.Category.Category' for 'Diff''.
@@ -138,18 +138,14 @@ instance Traced (,) (Diff' p) where
            in snd bd
      in (c, pullback)
 
-  untrace (Diff f) = Diff $ \(a, b) ->
-    let (c, back) = f b
-     in ((a, c), Data.Bifunctor.second back)
-
 -- | Cartesian channel plumbing for 'Diff'.
-instance Monoidal (,) (Diff' p) where
+instance Channel (,) (Diff' p) where
   assoc = Diff (\((s, s'), x) -> ((s, (s', x)), \(s'', (s''', x')) -> ((s'', s'''), x')))
   assoc' = Diff (\(s, (s', x)) -> (((s, s'), x), \((s'', s'''), x') -> (s'', (s''', x'))))
-  braid = Diff (\(s, (s', x)) -> ((s', (s, x)), \(s'', (s''', x')) -> (s''', (s'', x'))))
+  slide = Diff (\(s, (s', x)) -> ((s', (s, x)), \(s'', (s''', x')) -> (s''', (s'', x'))))
 
 -- | Cocartesian channel plumbing for 'Diff'.
-instance Monoidal Either (Diff' p) where
+instance Channel Either (Diff' p) where
   assoc =
     Diff
       ( \case
@@ -164,13 +160,29 @@ instance Monoidal Either (Diff' p) where
           Right (Left b) -> (Left (Right b), \case Left (Right db) -> Right (Left db); _ -> error "assoc'")
           Right (Right c) -> (Right c, \case Right dc -> Right (Right dc); _ -> error "assoc'")
       )
-  braid =
+  slide =
     Diff
       ( \case
-          Left a -> (Right (Left a), \case Right (Left da) -> Left da; _ -> error "braid")
-          Right (Left b) -> (Left b, \case Left db -> Right (Left db); _ -> error "braid")
-          Right (Right c) -> (Right (Right c), \case Right (Right dc) -> Right (Right dc); _ -> error "braid")
+          Left a -> (Right (Left a), \case Right (Left da) -> Left da; _ -> error "slide")
+          Right (Left b) -> (Left b, \case Left db -> Right (Left db); _ -> error "slide")
+          Right (Right c) -> (Right (Right c), \case Right (Right dc) -> Right (Right dc); _ -> error "slide")
       )
+
+-- | Cartesian tensorial strength for 'Diff'.
+instance Strength (,) (Diff' p) where
+  strength (Diff f) = Diff $ \(a, b) ->
+    let (c, back) = f b
+     in ((a, c), \(da, dc) -> (da, back dc))
+  {-# INLINE strength #-}
+
+-- | Cocartesian tensorial strength for 'Diff'.
+instance Strength Either (Diff' p) where
+  strength (Diff f) = Diff $ \case
+    Left a -> (Left a, \case Left da -> Left da; Right _ -> error "strength: Left input, Right cotangent")
+    Right b ->
+      let (c, back) = f b
+       in (Right c, \case Right dc -> Right (back dc); Left _ -> error "strength: Right input, Left cotangent")
+  {-# INLINE strength #-}
 
 -- | Trace for 'Diff' with the 'Either' tensor.
 --
@@ -246,12 +258,6 @@ instance Traced Either (Diff' p) where
               error "Circuit.AD.Trace Diff Either: Right cotangent mid-chain (tag-dishonest pullback)"
      in (c, pullback)
 
-  untrace (Diff f) = Diff $ \case
-    Left a -> (Left a, \case Left da -> Left da; Right _ -> error "untrace: Left input, Right cotangent")
-    Right b ->
-      let (c, back) = f b
-       in (Right c, \case Right dc -> Right (back dc); Left _ -> error "untrace: Right input, Left cotangent")
-
 -- | Iterated trace for strict carriers.
 --
 -- The lazy 'trace' diverges on strict cotangent types ('Double', etc.) when
@@ -271,7 +277,7 @@ instance Traced Either (Diff' p) where
 --
 -- Lives beside the lawful-but-lazy instance, not replacing it.
 traceNFrom ::
-  (Monoid (->) a) =>
+  (MergeZero (->) a) =>
   a ->
   Int ->
   Diff' p (a, b) (a, c) ->
@@ -344,7 +350,7 @@ traceNFrom x0 n (Diff body) = Diff $ \b ->
 -- affine-with-offset is a bug that this function will silently
 -- misread.
 traceStarFrom ::
-  (NHR.StarSemiring j, Monoid (->) c) =>
+  (NHR.StarSemiring j, MergeZero (->) c) =>
   -- | forward seed
   j ->
   -- | forward iteration count
@@ -494,16 +500,16 @@ linearizeNet n a = case n of
     let ~((x, b), f') = linearizeNet f (x, a)
      in (b, Knot f')
 
--- | Pointwise linearization over the core 'Trace' language.  The
+-- | Pointwise linearization over the core 'Loop' language.  The
 -- bimonoid rows ('Copy', 'Plus', ...) have already been melted into
--- 'Arr's by 'Circuit.Net.melt', so this recursion only sees 'Arr' and
+-- 'Lift's by 'Circuit.Net.melt', so this recursion only sees 'Lift' and
 -- 'Knot'.
 linearizeCircuit ::
   forall p a b.
-  C.Trace (,) (Diff' p) a b ->
+  C.Loop (,) (Diff' p) a b ->
   a ->
   (b, Net (,) Pullback b a)
-linearizeCircuit (C.Arr (Diff f)) a =
+linearizeCircuit (C.Lift (Diff f)) a =
   let (b, pb) = f a
    in (b, Lift (Pullback pb))
 linearizeCircuit (C.Knot f) a =
@@ -511,7 +517,7 @@ linearizeCircuit (C.Knot f) a =
    in (b, Knot (Lift (Pullback pb)))
 
 -- ---------------------------------------------------------------------------
--- Comonoid Diff — copy and discard for the differentiable arrow.
+-- CopyDiscard Diff — copy and discard for the differentiable arrow.
 --
 -- In Diff, the bimonoid is self-dual under differentiation: copy's pullback
 -- is plus, discard's pullback is zero, plus's pullback is dup, zero's
@@ -522,11 +528,11 @@ linearizeCircuit (C.Knot f) a =
 -- | Copy in D: the pullback is 'plus' (fan-in on the backward pass).
 --
 -- >>> import Circuit.Tensor (Action(..))
--- >>> import Circuit.Dagger (Comonoid(..))
+-- >>> import Circuit.Dagger (CopyDiscard(..))
 -- >>> let (_, pb) = runDiff (dup :: Diff Int (Int, Int)) 5
 -- >>> pb (1, 2)
 -- 3
-instance (Monoid (->) a) => Comonoid (Diff' p) a where
+instance (MergeZero (->) a) => CopyDiscard (Diff' p) a where
   copy = Diff (\a -> ((a, a), CD.plus))
   {-# INLINE copy #-}
 
@@ -538,7 +544,7 @@ instance (Monoid (->) a) => Comonoid (Diff' p) a where
 -- >>> let (_, pb) = runDiff (plus :: Diff (Int, Int) Int) (3, 4)
 -- >>> pb 1
 -- (1,1)
-instance (Monoid (->) a) => Monoid (Diff' p) a where
+instance (MergeZero (->) a) => MergeZero (Diff' p) a where
   plus = Diff (\(a, b) -> (CD.plus (a, b), \d -> (d, d)))
   {-# INLINE plus #-}
 
