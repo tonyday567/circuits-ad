@@ -488,14 +488,17 @@ linearizeNet n a = case n of
     let (x, y) = a
      in ((y, x), Swap)
   Copy ->
-    ((a, a), Lift (Pullback (\(db1, db2) -> fst (runDiff (plus @(Diff' p) @a) (db1, db2)))))
+    let (out, pb) = runDiff (copy :: Diff' p a (a, a)) a
+     in (out, Lift (Pullback pb))
   Discard ->
-    ((), Lift (Pullback (\_ -> fst (runDiff (zero @(Diff' p) @a) ()))))
+    let (out, pb) = runDiff (discard :: Diff' p a ()) a
+     in (out, Lift (Pullback pb))
   Plus ->
-    let (x, y) = a
-     in (fst (runDiff (plus @(Diff' p) @b) (x, y)), Lift (Pullback (\dc -> (dc, dc))))
+    let (out, pb) = runDiff (plus :: Diff' p (b, b) b) a
+     in (out, Lift (Pullback pb))
   Zero ->
-    (fst (runDiff (zero @(Diff' p) @b) ()), Lift (Pullback (const ())))
+    let (out, pb) = runDiff (zero :: Diff' p () b) ()
+     in (out, Lift (Pullback pb))
   Knot f ->
     let ~((x, b), f') = linearizeNet f (x, a)
      in (b, Knot f')
