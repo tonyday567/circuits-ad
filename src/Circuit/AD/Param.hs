@@ -39,7 +39,7 @@ module Circuit.AD.Param
   )
 where
 
-import Circuit.Category (Category (..), Discrete (..))
+import Circuit.Category (Category (..), Discrete (..), ObDict (..))
 import Circuit.Channel (Channel (..))
 import Circuit.Dagger (CopyDiscard (..), MergeZero (..))
 import Circuit.Dagger qualified as CD
@@ -157,6 +157,9 @@ instance (MergeZero (->) p) => Channel (,) (DiffP p) where
 
   slide = DiffP $ \_ (a, (b, c)) -> ((b, (a, c)), \(db, (da, dc)) -> ((da, (db, dc)), CD.zero ()))
   {-# INLINE slide #-}
+
+  withTensorOb ObDict ObDict x = x
+  {-# INLINE withTensorOb #-}
 
 ----------------------------------------------------------------------
 -- Monoidal product of morphisms

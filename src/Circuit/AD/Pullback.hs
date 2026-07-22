@@ -25,7 +25,7 @@ module Circuit.AD.Pullback
   )
 where
 
-import Circuit.Category (Category (..), Discrete (..))
+import Circuit.Category (Category (..), Discrete (..), ObDict (..))
 import Circuit.Channel (Channel (..), Strength (..), Traced (..))
 import Circuit.Dagger (CopyDiscard (..), MergeZero (..))
 import Circuit.Layer (run)
@@ -89,6 +89,8 @@ instance Action (,) Pullback where
 instance Strength (,) Pullback where
   strength (Pullback f) = Pullback (\(a, b) -> (a, f b))
   {-# INLINE strength #-}
+  withStrengthOb ObDict ObDict ObDict x = x
+  {-# INLINE withStrengthOb #-}
 
 -- | The cartesian trace for pullbacks.
 --
@@ -170,3 +172,5 @@ instance Channel (,) Pullback where
   assoc = Pullback (\((s, s'), x) -> (s, (s', x)))
   assoc' = Pullback (\(s, (s', x)) -> ((s, s'), x))
   slide = Pullback (\(s, (s', x)) -> (s', (s, x)))
+  withTensorOb ObDict ObDict x = x
+  {-# INLINE withTensorOb #-}
