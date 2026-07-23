@@ -9,6 +9,8 @@ import Circuit.AD.Pullback (evalPullback)
 import Circuit.Tensor (Action (..))
 import Circuit.Net (Net (..))
 import Circuit.Channel (Traced (..))
+import GeodesicFlow (runGeodesicFlowTests)
+import Kepler (runKeplerTests)
 import MatrixStar (runMatrixStarTests)
 import MetricAdjoint (runMetricAdjointTests)
 import NumHask.Diff ()
@@ -124,3 +126,5 @@ main = do
   runStarEliminateTests
   runTagTests
   runMetricAdjointTests
+  runKeplerTests
+  runGeodesicFlowTests

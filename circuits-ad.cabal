@@ -54,6 +54,8 @@ test-suite verify
   hs-source-dirs: test
   main-is: Verify.hs
   other-modules:
+    GeodesicFlow
+    Kepler
     MatrixStar
     MetricAdjoint
     StarEliminate
