@@ -20,7 +20,7 @@
 -- which pays @n@ probes per cotangent and is only as exact as @n@ is
 -- large.  Here the backward pass is exact whenever the star exists.
 --
--- The dependency is deliberate: this module imports "Circuit.AD.Matrix",
+-- The dependency is deliberate: this module imports "Harpie.NumHask.Matrix",
 -- making circuits-ad ⇄ star-matrix a literal edge rather than a nominal
 -- alias.
 module Circuit.AD.Star
@@ -34,7 +34,7 @@ module Circuit.AD.Star
 where
 
 import Circuit.AD (Diff, Diff', traceStarFrom, pattern Diff)
-import Circuit.AD.Matrix (Matrix (..), matVec, starMatrix)
+import Harpie.NumHask.Matrix (Matrix (..), fromLists, matVec, starMatrix)
 import Circuit.Dagger (MergeZero (..))
 import Circuit.Dagger qualified as CD
 import NumHask.Algebra.Additive qualified as NHA
@@ -83,7 +83,7 @@ traceStarMatrix x0 n (Diff body) = Diff $ \b ->
       zeroV = replicate dim NHA.zero
       basis i = [if k == i then NHM.one else NHA.zero | k <- [0 .. dim - 1]]
       cols = [fst (backward (basis i, CD.zero ())) | i <- [0 .. dim - 1]]
-      aMat = Matrix [[col !! k | col <- cols] | k <- [0 .. dim - 1]]
+      aMat = fromLists [[col !! k | col <- cols] | k <- [0 .. dim - 1]]
       -- star A — Gaussian elimination / Warshall / Floyd–Warshall /
       -- state elimination, depending on the carrier
       aStar = starMatrix aMat

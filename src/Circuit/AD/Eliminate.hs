@@ -9,7 +9,7 @@
 -- function composition, and every 'Trace' ties an affine feedback equation.
 -- This module eliminates those knots in closed form using the Kleene star
 -- ('NumHask.Algebra.Ring.StarSemiring' for scalar channels,
--- 'Circuit.AD.Matrix.starMatrix' for vector channels).
+-- 'Harpie.NumHask.Matrix.starMatrix' for vector channels).
 --
 -- The pass is /structural/: it recurses through the net, replaces each
 -- 'Trace' (innermost first — Bekić order) with a single solved 'Lift', and
@@ -27,7 +27,7 @@ module Circuit.AD.Eliminate
   )
 where
 
-import Circuit.AD.Matrix (Matrix (..), matVec, starMatrix)
+import Harpie.NumHask.Matrix (Matrix (..), fromLists, matVec, starMatrix, toLists)
 import Circuit.AD.Melt (melt)
 import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Dagger qualified
@@ -99,10 +99,10 @@ instance StarChannel FieldStar where
   basisChannel _ _ = NHM.one
   addChannel (FieldStar x) (FieldStar y) = FieldStar (x P.+ y)
   negateChannel (FieldStar x) = FieldStar (P.negate x)
-  selfMatrix _ f = Matrix [[f NHM.one]]
-  applyMatrix (Matrix [[s]]) v = s NHM.* v
-  applyMatrix _ _ =
-    error "Circuit.AD.Eliminate.applyMatrix: scalar channel expected a 1x1 matrix"
+  selfMatrix _ f = fromLists [[f NHM.one]]
+  applyMatrix m v = case toLists m of
+    [[s]] -> s NHM.* v
+    _ -> error "Circuit.AD.Eliminate.applyMatrix: scalar channel expected a 1x1 matrix"
 
 -- | n-dimensional channel as a list of scalar cotangents.
 --
@@ -125,7 +125,7 @@ instance
   negateChannel = fmap NHA.negate
   selfMatrix n f =
     let cols = [f (basisChannel n i) | i <- [0 .. n - 1]]
-     in Matrix [[col !! k | col <- cols] | k <- [0 .. n - 1]]
+     in fromLists [[col !! k | col <- cols] | k <- [0 .. n - 1]]
   applyMatrix = matVec
 
 -- | 'FieldStar' as a numeric carrier for circuits' additive structure, so
