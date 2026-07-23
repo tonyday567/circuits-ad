@@ -23,6 +23,12 @@ module MetricAdjoint
 where
 
 import Circuit.AD
+import Circuit.AD.Chart
+  ( christoffel2D,
+    covariantDerivative,
+    polarMetricLower,
+    polarMetricRaise,
+  )
 import Circuit.AD.Metric (adjointWith)
 import NumHask.Prelude
 import Prelude ()
@@ -33,108 +39,6 @@ basis0 = (1, 0)
 
 basis1 :: (Double, Double)
 basis1 = (0, 1)
-
--- | Extract the partial derivatives of the metric components from the metric's
--- own AD pullback.  For a lower operation @c_j = g_{jk}(x) v^k@, the pullback's
--- point-slot at @v = e_k@ and output cotangent @dc = e_j@ yields the covector
--- @∂_i g_{jk} dx^i@.  Probing all four combinations assembles @∂g@.
-partialG ::
-  Diff ((Double, Double), (Double, Double)) (Double, Double) ->
-  (Double, Double) ->
-  -- | @∂_i g_{jk}@ indexed by @(i, j, k)@.
-  (((Double, Double), (Double, Double)), ((Double, Double), (Double, Double)))
-partialG lower x =
-  let probe v dc =
-        let (_, back) = runDiff lower (x, v)
-            (dpoint, _) = back dc
-         in dpoint
-      -- ∂_i g_{j0} for i,j = 0,1
-      row0 = (probe basis0 basis0, probe basis0 basis1)
-      -- ∂_i g_{j1} for i,j = 0,1
-      row1 = (probe basis1 basis0, probe basis1 basis1)
-   in (row0, row1)
-
--- | Christoffel symbols @Γ^c_{ab}@ of a 2D metric, from @∂g@ and @g^{-1}@.
---
--- Uses the standard formula @Γ^c_{ab} = ½ g^{ci}(∂_a g_{ib} + ∂_b g_{ia} - ∂_i g_{ab})@.
-christoffel2D ::
-  Diff ((Double, Double), (Double, Double)) (Double, Double) ->
-  Diff ((Double, Double), (Double, Double)) (Double, Double) ->
-  (Double, Double) ->
-  -- | @(Γ^0_{00}, Γ^0_{01}, Γ^0_{10}, Γ^0_{11}, Γ^1_{00}, Γ^1_{01}, Γ^1_{10}, Γ^1_{11})@.
-  (Double, Double, Double, Double, Double, Double, Double, Double)
-christoffel2D lower raise x =
-  let pg = partialG lower x
-      -- g^{c i} for i = 0,1; c = 0,1
-      ((g00, g01), (g10, g11)) =
-        let (v0, _) = runDiff raise (x, basis0)
-            (v1, _) = runDiff raise (x, basis1)
-         in (v0, v1)
-      -- ∂_i g_{jk} accessor
-      d :: Int -> Int -> Int -> Double
-      d i j k = case (i, j, k) of
-        (0, 0, 0) -> fst (fst (fst pg))
-        (0, 0, 1) -> fst (snd (fst pg))
-        (0, 1, 0) -> fst (fst (snd pg))
-        (0, 1, 1) -> fst (snd (snd pg))
-        (1, 0, 0) -> snd (fst (fst pg))
-        (1, 0, 1) -> snd (snd (fst pg))
-        (1, 1, 0) -> snd (fst (snd pg))
-        (1, 1, 1) -> snd (snd (snd pg))
-        _ -> error "christoffel2D: index out of range"
-      gamma :: Int -> Int -> Int -> Double
-      gamma c a b =
-        0.5
-          * ( (if c == (0 :: Int) then g00 else g10)
-                * (d a 0 b + d b 0 a - d 0 a b)
-                + (if c == (0 :: Int) then g01 else g11)
-                * (d a 1 b + d b 1 a - d 1 a b)
-            )
-   in ( gamma 0 0 0,
-        gamma 0 0 1,
-        gamma 0 1 0,
-        gamma 0 1 1,
-        gamma 1 0 0,
-        gamma 1 0 1,
-        gamma 1 1 0,
-        gamma 1 1 1
-      )
-
--- | Directional derivative of a vector field from its AD pullback.
---
--- For @V : R^2 -> R^2@, the Jacobian @J_V@ is recovered from the pullback
--- @J_V^T@ by @e_c · (J_V dx) = dx · (J_V^T e_c)@.
-directionalDerivative ::
-  Diff (Double, Double) (Double, Double) ->
-  (Double, Double) ->
-  (Double, Double) ->
-  (Double, Double)
-directionalDerivative v x dx =
-  let (_, vt) = runDiff v x
-      vTe0 = vt basis0
-      vTe1 = vt basis1
-   in (fst dx * fst vTe0 + snd dx * snd vTe0, fst dx * fst vTe1 + snd dx * snd vTe1)
-
--- | Covariant derivative @∇_dx V@ at a point, using the metric's Christoffel
--- symbols: @∇_dx V = ∂_dx V + Γ(x)(dx, V(x))@.
-covariantDerivative ::
-  Diff ((Double, Double), (Double, Double)) (Double, Double) ->
-  Diff ((Double, Double), (Double, Double)) (Double, Double) ->
-  Diff (Double, Double) (Double, Double) ->
-  (Double, Double) ->
-  (Double, Double) ->
-  (Double, Double)
-covariantDerivative lower raise v x dx =
-  let (vx, _) = runDiff v x
-      (g000, g001, g010, g011, g100, g101, g110, g111) = christoffel2D lower raise x
-      dx0 = fst dx
-      dx1 = snd dx
-      v0 = fst vx
-      v1 = snd vx
-      gamma0 = g000 * dx0 * v0 + g001 * dx0 * v1 + g010 * dx1 * v0 + g011 * dx1 * v1
-      gamma1 = g100 * dx0 * v0 + g101 * dx0 * v1 + g110 * dx1 * v0 + g111 * dx1 * v1
-      partial = directionalDerivative v x dx
-   in (fst partial + gamma0, snd partial + gamma1)
 
 near :: Double -> Double -> Bool
 near x y = abs (x - y) < 1e-9
@@ -279,3 +183,35 @@ runMetricAdjointTests = do
   let eTheta = Diff $ const ((0, 1), const (0, 0))
       nablaThetaTheta = covariantDerivative lowerPolar raisePolar eTheta (r, theta) basis1
   assertV2 "∇_θ e_θ" nablaThetaTheta (negate r, 0)
+
+  putStrLn "chart-derived polar metric matches hand-coded metric"
+  let vec = (1.5, negate 0.75)
+      (vLoweredHand, _) = runDiff lowerPolar ((r, theta), vec)
+      (vLoweredChart, _) = runDiff polarMetricLower ((r, theta), vec)
+  assertV2 "chart lower = hand-coded lower" vLoweredChart vLoweredHand
+  let (vRaisedHand, _) = runDiff raisePolar ((r, theta), vLoweredHand)
+      (vRaisedChart, _) = runDiff polarMetricRaise ((r, theta), vLoweredHand)
+  assertV2 "chart raise = hand-coded raise" vRaisedChart vRaisedHand
+
+  putStrLn "chart-derived polar metric adjoint matches analytic gradient"
+  let (_, pbChart) = runDiff (adjointWith polarMetricRaise euclidean1D fPolar) (r, theta)
+      chartGrad = pbChart 1.0
+  assertV2 "chart polar gradient matches analytic" chartGrad expectedPolar
+
+  putStrLn "chart-derived Christoffel symbols match polar connection"
+  let (c000, c001, c010, c011, c100, c101, c110, c111) =
+        christoffel2D polarMetricLower polarMetricRaise (r, theta)
+  assert "chart Γ^r_{rr}" c000 0
+  assert "chart Γ^r_{rθ}" c001 0
+  assert "chart Γ^r_{θr}" c010 0
+  assert "chart Γ^r_{θθ}" c011 (negate r)
+  assert "chart Γ^θ_{rr}" c100 0
+  assert "chart Γ^θ_{rθ}" c101 (recip r)
+  assert "chart Γ^θ_{θr}" c110 (recip r)
+  assert "chart Γ^θ_{θθ}" c111 0
+
+  putStrLn "chart-derived covariant derivative matches polar connection"
+  let nablaThetaERChart = covariantDerivative polarMetricLower polarMetricRaise eR (r, theta) basis1
+  assertV2 "chart ∇_θ e_r" nablaThetaERChart (0, recip r)
+  let nablaThetaThetaChart = covariantDerivative polarMetricLower polarMetricRaise eTheta (r, theta) basis1
+  assertV2 "chart ∇_θ e_θ" nablaThetaThetaChart (negate r, 0)

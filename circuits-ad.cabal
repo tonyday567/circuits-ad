@@ -30,6 +30,7 @@ library
   hs-source-dirs: src
   exposed-modules:
     Circuit.AD
+    Circuit.AD.Chart
     Circuit.AD.Eliminate
     Circuit.AD.Melt
     Circuit.AD.Metric
