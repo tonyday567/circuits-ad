@@ -32,6 +32,7 @@ library
   exposed-modules:
     Circuit.AD
     Circuit.AD.Chart
+    Circuit.AD.Curvature
     Circuit.AD.Eliminate
     Circuit.AD.Melt
     Circuit.AD.Metric
@@ -46,13 +47,13 @@ library
     numhask >=0.14 && <0.15,
     transformers >=0.5 && <0.7,
 
-test-suite verify
+executable circuits-ad-verify
   import: ghc-options-stanza
   default-language: GHC2024
-  type: exitcode-stdio-1.0
-  hs-source-dirs: test
-  main-is: Verify.hs
+  hs-source-dirs: app
+  main-is: verify.hs
   other-modules:
+    Curvature
     GeodesicFlow
     Kepler
     MatrixStar

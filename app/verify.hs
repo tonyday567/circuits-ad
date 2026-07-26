@@ -9,6 +9,7 @@ import Circuit.AD.Pullback (evalPullback)
 import Circuit.Tensor (Action (..))
 import Circuit.Net (Net (..))
 import Circuit.Channel (Traced (..))
+import Curvature (runCurvatureTests)
 import GeodesicFlow (runGeodesicFlowTests)
 import Kepler (runKeplerTests)
 import MatrixStar (runMatrixStarTests)
@@ -128,3 +129,4 @@ main = do
   runMetricAdjointTests
   runKeplerTests
   runGeodesicFlowTests
+  runCurvatureTests
