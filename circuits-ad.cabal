@@ -5,11 +5,12 @@ license: BSD-3-Clause
 author: Tony Day
 maintainer: tonyday567@gmail.com
 category: math
-synopsis: Oracle tests: circuits reverse-mode AD against ad-delcont
+synopsis: Reverse-mode automatic differentiation for circuits
 description:
   Reverse-mode automatic differentiation for the circuits ecosystem.
-  Provides an oracle comparing circuit derivatives against ad-delcont,
-  plus eliminators, pullbacks, and star-semiring structure for AD.
+  Provides eliminators, pullbacks, and star-semiring structure for AD.
+  Oracle comparisons against ad-delcont live in the separate
+  @circuits-ad-observe@ package.
 build-type: Simple
 
 source-repository head
@@ -34,7 +35,6 @@ library
     Circuit.AD.Eliminate
     Circuit.AD.Melt
     Circuit.AD.Metric
-    Circuit.AD.Oracle
     Circuit.AD.Param
     Circuit.AD.Pullback
     Circuit.AD.Star
@@ -44,7 +44,6 @@ library
     harpie-numhask >=0.2 && <0.3,
     numhask-diff >=0.1 && <0.2,
     numhask >=0.14 && <0.15,
-    ad-delcont >=0.5 && <0.6,
     transformers >=0.5 && <0.7,
 
 test-suite verify
