@@ -10,6 +10,7 @@ import Circuit.Tensor (Action (..))
 import Circuit.Net (Net (..))
 import Circuit.Channel (Traced (..))
 import Curvature (runCurvatureTests)
+import DubinsChase (runDubinsChase)
 import GeodesicFlow (runGeodesicFlowTests)
 import Kepler (runKeplerTests)
 import MatrixStar (runMatrixStarTests)
@@ -130,3 +131,4 @@ main = do
   runKeplerTests
   runGeodesicFlowTests
   runCurvatureTests
+  runDubinsChase

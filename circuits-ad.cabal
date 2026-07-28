@@ -33,6 +33,7 @@ library
     Circuit.AD
     Circuit.AD.Chart
     Circuit.AD.Curvature
+    Circuit.AD.DubinsChase
     Circuit.AD.Eliminate
     Circuit.AD.Melt
     Circuit.AD.Metric
@@ -54,6 +55,7 @@ executable circuits-ad-verify
   main-is: verify.hs
   other-modules:
     Curvature
+    DubinsChase
     GeodesicFlow
     Kepler
     MatrixStar
