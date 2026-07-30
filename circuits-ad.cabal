@@ -48,11 +48,11 @@ library
     numhask >=0.14 && <0.15,
     transformers >=0.5 && <0.7,
 
-executable circuits-ad-verify
+executable circuits-ad-axioma
   import: ghc-options-stanza
   default-language: GHC2024
   hs-source-dirs: app
-  main-is: verify.hs
+  main-is: axioma.hs
   other-modules:
     Curvature
     DubinsChase
