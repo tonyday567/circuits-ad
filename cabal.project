@@ -5,6 +5,6 @@ packages:
   ../numhask-diff/numhask-diff.cabal
   ../harpie/harpie.cabal
   ../harpie-numhask/harpie-numhask.cabal
-  ../circuits-ad-observe/circuits-ad-observe.cabal
+  ../../machina/circuits-ad-machina/circuits-ad-machina.cabal
 
 write-ghc-environment-files: always
