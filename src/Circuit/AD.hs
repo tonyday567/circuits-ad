@@ -349,7 +349,7 @@ traceNFrom x0 n (Diff body) = Diff $ \b ->
 -- instances; the only carriers in the tower are
 -- 'NumHask.Free.Carriers.FieldStar' (@star a = recip (1−a)@),
 -- @Warshall@, and @MinPlus@.  For bare 'Double' channels and for /vector/
--- channels solved by 'Harpie.NumHask.Matrix.starMatrix', see
+-- channels solved by 'Circuit.Mat.Dense.starMatrix', see
 -- @Circuit.AD.Star@ — the Schur-complement bridge proper.
 --
 -- __Proof obligation__: the probes assume the pullback is linear.
@@ -392,7 +392,7 @@ traceStarFrom x0 n (Diff body) = Diff $ \b ->
 -- 'NHR.StarSemiring' instances, so for concrete carriers prefer
 -- 'traceStarFrom' (scalar channel, closed-form backward) or
 -- @Circuit.AD.Star.traceStarMatrix@ (vector channel, solved by
--- 'Harpie.NumHask.Matrix.starMatrix' — the bridge made literal).
+-- 'Circuit.Mat.Dense.starMatrix' — the bridge made literal).
 traceStar :: (NHR.StarSemiring j) => Diff' p (j, b) (j, c) -> Diff' p b c
 traceStar = trace
 
@@ -425,7 +425,7 @@ traceStar = trace
 -- backward side deserves better: the pullback net is linear by
 -- construction, so its knots satisfy affine equations and can be
 -- /eliminated/ — probe the knot body for its channel matrix,
--- 'Harpie.NumHask.Matrix.starMatrix' it, and replace the 'Trace' with a 'Lift'.
+-- 'Circuit.Mat.Dense.starMatrix' it, and replace the 'Trace' with a 'Lift'.
 -- That elimination pass is state elimination on a linear circuit: the
 -- linear-representation normal form that @kleeneSimplify@ gestures at,
 -- landing where it can actually be lawful.

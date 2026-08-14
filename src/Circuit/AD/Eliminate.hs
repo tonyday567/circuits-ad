@@ -9,7 +9,7 @@
 -- function composition, and every 'Trace' ties an affine feedback equation.
 -- This module eliminates those knots in closed form using the Kleene star
 -- ('NumHask.Algebra.Ring.StarSemiring' for scalar channels,
--- 'Harpie.NumHask.Matrix.starMatrix' for vector channels).
+-- 'Circuit.Mat.Dense.starMatrix' for vector channels).
 --
 -- The pass is /structural/: it recurses through the net, replaces each
 -- 'Trace' (innermost first — Bekić order) with a single solved 'Lift', and
@@ -27,7 +27,7 @@ module Circuit.AD.Eliminate
   )
 where
 
-import Harpie.NumHask.Matrix (Matrix (..), fromLists, matVec, starMatrix, toLists)
+import Circuit.Mat.Dense (Matrix (..), fromLists, matVec, starMatrix, toLists)
 import Circuit.AD.Melt (melt)
 import Circuit.AD.Pullback (Pullback (..))
 import Circuit.Dagger qualified

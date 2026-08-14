@@ -1,6 +1,6 @@
 module MatrixStar (runMatrixStarTests) where
 
-import Harpie.NumHask.Matrix (Matrix (..), fromLists, starMatrix, toLists)
+import Circuit.Mat.Dense (Matrix (..), fromLists, starMatrix, toLists)
 import NumHask.Free.Carriers (FieldStar (..), MinPlus (..), Warshall (..))
 import System.Exit (exitFailure)
 import Prelude

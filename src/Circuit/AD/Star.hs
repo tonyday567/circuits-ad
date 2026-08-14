@@ -20,7 +20,7 @@
 -- which pays @n@ probes per cotangent and is only as exact as @n@ is
 -- large.  Here the backward pass is exact whenever the star exists.
 --
--- The dependency is deliberate: this module imports "Harpie.NumHask.Matrix",
+-- The dependency is deliberate: this module imports "Circuit.Mat.Dense",
 -- making circuits-ad ⇄ star-matrix a literal edge rather than a nominal
 -- alias.
 module Circuit.AD.Star
@@ -34,7 +34,7 @@ module Circuit.AD.Star
 where
 
 import Circuit.AD (Diff, Diff', traceStarFrom, pattern Diff)
-import Harpie.NumHask.Matrix (Matrix (..), fromLists, matVec, starMatrix)
+import Circuit.Mat.Dense (Matrix (..), fromLists, matVec, starMatrix)
 import Circuit.Dagger (MergeZero (..))
 import Circuit.Dagger qualified as CD
 import NumHask.Algebra.Additive qualified as NHA
